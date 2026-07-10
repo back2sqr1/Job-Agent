@@ -1,0 +1,16 @@
+{
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "email": "jane@example.com",
+  "phone": "555-555-5555",
+  "city": "Springfield",
+  "state": "IL",
+  "school": "State University",
+  "degree": "B.S. Computer Science",
+  "graduationMonth": "May",
+  "graduationYear": 2027,
+  "linkedin": "https://www.linkedin.com/in/jane-doe",
+  "github": "https://github.com/janedoe",
+  "portfolio": "https://janedoe.example.com",
+  "resumePath": "resumes/your-resume.pdf"
+}

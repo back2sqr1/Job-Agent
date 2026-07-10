@@ -7,6 +7,8 @@
   "scripts": {
     "scan": "tsx src/cli/scan.ts",
     "start": "tsx src/server.ts",
+    "apply": "tsx src/cli/apply.ts",
+    "test:ats": "tsx scripts/test-ats-fixtures.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
@@ -14,7 +16,7 @@
     "better-sqlite3": "^11.10.0",
     "express": "^4.21.2",
     "js-yaml": "^4.1.0",
-    "playwright": "^1.53.0"
+    "playwright": "~1.56.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

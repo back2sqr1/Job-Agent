@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Software Engineer, New Grad — Acme Corp (Greenhouse fixture)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, select, textarea { display: block; width: 100%; padding: 6px; margin-top: 4px; }
+    fieldset { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <!--
+    Local test fixture mirroring the stable field labels of a Greenhouse
+    job-board application form (job-boards.greenhouse.io). Uses proper
+    <label for> associations so getByLabel() has something real to match.
+    This tests the fill logic, not today's exact production markup.
+  -->
+  <h1>Software Engineer, New Grad</h1>
+  <h2>Apply for this job</h2>
+
+  <form>
+    <label for="first_name">First Name *</label>
+    <input type="text" id="first_name" name="job_application[first_name]">
+
+    <label for="last_name">Last Name *</label>
+    <input type="text" id="last_name" name="job_application[last_name]">
+
+    <label for="email">Email *</label>
+    <input type="email" id="email" name="job_application[email]">
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="job_application[phone]">
+
+    <label for="resume">Resume/CV *</label>
+    <input type="file" id="resume" name="job_application[resume]">
+
+    <label for="cover_letter">Cover Letter</label>
+    <input type="file" id="cover_letter" name="job_application[cover_letter]">
+
+    <label for="candidate-location">Location (City) *</label>
+    <input type="text" id="candidate-location" name="job_application[location]">
+
+    <label for="question_linkedin">LinkedIn Profile</label>
+    <input type="text" id="question_linkedin" name="job_application[answers][linkedin]">
+
+    <label for="question_website">Website</label>
+    <input type="text" id="question_website" name="job_application[answers][website]">
+
+    <label for="school">School</label>
+    <input type="text" id="school" name="job_application[school]">
+
+    <label for="degree">Degree</label>
+    <select id="degree" name="job_application[degree]">
+      <option value=""></option>
+      <option value="bs">Bachelor's Degree</option>
+      <option value="ms">Master's Degree</option>
+    </select>
+
+    <label for="grad_date">Expected Graduation Date</label>
+    <input type="text" id="grad_date" name="job_application[answers][grad_date]">
+
+    <!-- Custom questions: must be left blank, never answered on the user's behalf -->
+    <label for="question_why">Why do you want to work at Acme Corp?</label>
+    <textarea id="question_why" name="job_application[answers][why]" rows="4"></textarea>
+
+    <label for="question_salary">Desired salary</label>
+    <input type="text" id="question_salary" name="job_application[answers][salary]">
+
+    <!-- EEO / voluntary self-identification: must NEVER be auto-filled -->
+    <fieldset>
+      <legend>Voluntary Self-Identification</legend>
+
+      <label for="gender_identity">Gender identity (voluntary self-identification)</label>
+      <input type="text" id="gender_identity" name="job_application[eeoc][gender]">
+
+      <label for="hispanic">Are you Hispanic/Latino?</label>
+      <select id="hispanic" name="job_application[eeoc][hispanic]">
+        <option value=""></option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+
+      <label for="veteran">Veteran Status</label>
+      <select id="veteran" name="job_application[eeoc][veteran]">
+        <option value=""></option>
+        <option value="not">I am not a protected veteran</option>
+      </select>
+
+      <label for="disability">Disability Status</label>
+      <select id="disability" name="job_application[eeoc][disability]">
+        <option value=""></option>
+        <option value="no">No, I do not have a disability</option>
+      </select>
+    </fieldset>
+
+    <button type="submit">Submit application</button>
+  </form>
+</body>
+</html>

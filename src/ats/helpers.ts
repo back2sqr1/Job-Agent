@@ -1,0 +1,207 @@
+import type { Locator, Page } from 'playwright';
+import { FillResult } from './types';
+
+/**
+ * Accessible-name patterns for EEO / voluntary self-identification questions.
+ * Anything whose label matches this is NEVER auto-filled, no matter what a
+ * field spec's patterns match — the Profile deliberately has no such data,
+ * and these questions must always be left for the human. This is a hard
+ * safety net on top of the fact that no handler even targets these labels.
+ */
+export const EEO_PATTERN =
+  /gender|race|ethnic|hispanic|latino|veteran|disabilit|disabled|sexual orientation|transgender|self.?identif|demographic|pronoun/i;
+
+/** Input types we are willing to type text into. Everything else is skipped. */
+const FILLABLE_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'search', '']);
+
+/**
+ * One profile-backed form field a handler wants to fill.
+ * `labels` are accessible-name patterns (tried in order via page.getByLabel);
+ * `fallbackSelectors` are optional last-resort CSS selectors for markup that
+ * doesn't associate its labels properly (e.g. Lever's stable `name=` attrs).
+ */
+export interface FieldSpec {
+  /** Human-readable name for FillResult, e.g. "First Name". */
+  field: string;
+  labels: RegExp[];
+  fallbackSelectors?: string[];
+  value: string;
+}
+
+/**
+ * Best-effort accessible/context text for an element: aria-label, associated
+ * <label for>, wrapping <label>, plus id/name attributes. Used both to find
+ * the resume input and to enforce the EEO guard.
+ */
+async function contextText(el: Locator): Promise<string> {
+  try {
+    return await el.evaluate((node) => {
+      const e = node as HTMLElement;
+      const parts: string[] = [];
+      const aria = e.getAttribute('aria-label');
+      if (aria) parts.push(aria);
+      if (e.id) {
+        const label = document.querySelector(`label[for="${CSS.escape(e.id)}"]`);
+        if (label?.textContent) parts.push(label.textContent);
+      }
+      const wrapping = e.closest('label');
+      if (wrapping?.textContent) parts.push(wrapping.textContent);
+      parts.push(e.id ?? '', e.getAttribute('name') ?? '');
+      return parts.join(' ');
+    });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Try to fill one concrete element. Returns true only when text actually went
+ * in. Refuses (returns false) rather than throwing when the element is:
+ *   - matching the EEO guard (never auto-answer those),
+ *   - a typeahead/combobox (typing without selecting an option usually does
+ *     not register — leave it to the human),
+ *   - not a plain text-like <input> (selects, checkboxes, radios, file
+ *     inputs, and — deliberately — textareas: free-text answers are never
+ *     generated or filled on the user's behalf).
+ */
+async function tryFillElement(el: Locator, value: string): Promise<boolean> {
+  try {
+    if (!(await el.isVisible())) return false;
+    if (EEO_PATTERN.test(await contextText(el))) return false;
+
+    const shape = await el.evaluate((node) => {
+      const e = node as HTMLInputElement;
+      return {
+        tag: e.tagName,
+        type: (e.getAttribute('type') ?? '').toLowerCase(),
+        role: e.getAttribute('role') ?? '',
+        autocomplete: e.getAttribute('aria-autocomplete') ?? '',
+        disabled: e.disabled === true,
+        readOnly: e.readOnly === true,
+      };
+    });
+    if (shape.tag !== 'INPUT') return false;
+    if (!FILLABLE_INPUT_TYPES.has(shape.type)) return false;
+    if (shape.disabled || shape.readOnly) return false;
+    if (shape.role === 'combobox' || shape.autocomplete === 'list') return false;
+
+    await el.fill(value, { timeout: 3_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Try every element a locator matches until one accepts the value. */
+async function tryFillLocator(loc: Locator, value: string): Promise<boolean> {
+  let count = 0;
+  try {
+    count = await loc.count();
+  } catch {
+    return false;
+  }
+  for (let i = 0; i < count; i++) {
+    if (await tryFillElement(loc.nth(i), value)) return true;
+  }
+  return false;
+}
+
+/**
+ * Fill one field per its spec, recording the outcome in `result`. A field
+ * that can't be found or safely filled lands in `skipped` — never an
+ * exception. The whole flow degrades to "partially filled, human finishes".
+ */
+export async function fillField(page: Page, spec: FieldSpec, result: FillResult): Promise<boolean> {
+  for (const pattern of spec.labels) {
+    if (await tryFillLocator(page.getByLabel(pattern), spec.value)) {
+      result.filled.push(spec.field);
+      return true;
+    }
+  }
+  for (const selector of spec.fallbackSelectors ?? []) {
+    if (await tryFillLocator(page.locator(selector), spec.value)) {
+      result.filled.push(spec.field);
+      return true;
+    }
+  }
+  result.skipped.push(spec.field);
+  return false;
+}
+
+/**
+ * Upload the resume into the page's resume/CV file input.
+ * Preference order: a file input whose label/context mentions resume or CV;
+ * otherwise, if the page has exactly one file input, use it. If there are
+ * several and none is identifiably the resume (e.g. resume + cover letter,
+ * neither labelled), skip rather than guess wrong. File inputs are often
+ * hidden behind styled buttons, so no visibility requirement here —
+ * setInputFiles works on hidden inputs.
+ */
+export async function uploadResume(
+  page: Page,
+  resumePath: string,
+  result: FillResult,
+): Promise<boolean> {
+  const fileInputs = page.locator('input[type="file"]');
+  let count = 0;
+  try {
+    count = await fileInputs.count();
+  } catch {
+    count = 0;
+  }
+
+  let target: Locator | null = null;
+  for (let i = 0; i < count; i++) {
+    const el = fileInputs.nth(i);
+    const text = await contextText(el);
+    if (EEO_PATTERN.test(text)) continue;
+    if (/resume|\bc\.?v\b/i.test(text)) {
+      target = el;
+      break;
+    }
+  }
+  if (!target && count === 1) target = fileInputs.first();
+
+  if (!target) {
+    result.skipped.push('Resume');
+    return false;
+  }
+  try {
+    await target.setInputFiles(resumePath, { timeout: 10_000 });
+    result.filled.push('Resume');
+    result.resumeUploaded = true;
+    return true;
+  } catch {
+    result.skipped.push('Resume');
+    return false;
+  }
+}
+
+/**
+ * Count visible, still-empty <textarea>s — a decent proxy for free-text
+ * custom questions ("Why do you want to work here?"), which are always left
+ * for the human to answer. Used to add a heads-up note to the FillResult.
+ */
+export async function countBlankTextareas(page: Page): Promise<number> {
+  try {
+    const areas = page.locator('textarea');
+    const count = await areas.count();
+    let blank = 0;
+    for (let i = 0; i < count; i++) {
+      const el = areas.nth(i);
+      if (!(await el.isVisible().catch(() => false))) continue;
+      const value = await el.inputValue().catch(() => '');
+      if (value.trim() === '') blank += 1;
+    }
+    return blank;
+  } catch {
+    return 0;
+  }
+}
+
+/** Shared note appended by handlers when custom questions remain. */
+export function customQuestionNote(blankTextareas: number): string | null {
+  if (blankTextareas === 0) return null;
+  const s = blankTextareas === 1 ? '' : 's';
+  return `${blankTextareas} free-text question${s} left blank for you to answer — nothing is ever written on your behalf.`;
+}

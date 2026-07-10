@@ -32,6 +32,20 @@ cp config/filters.example.yaml config/filters.yaml
 tracked, so your personal criteria never end up in git. If you skip this step,
 the app still runs but treats every new listing as a candidate.
 
+To use the Playwright-assisted apply flow (optional — everything else works
+without it):
+
+```bash
+npx playwright install chromium
+cp config/profile.example.json config/profile.json
+# edit config/profile.json — name, contact info, school, links, resumePath
+# put your resume at the path resumePath points to, e.g. resumes/your-resume.pdf
+```
+
+`config/profile.json` and everything under `resumes/` are gitignored — your
+real details and resume never end up in git; only `profile.example.json` is
+tracked.
+
 ## Usage
 
 ### Run the website (recommended)
@@ -61,6 +75,45 @@ This starts a local Express server (default `http://localhost:3000`) that:
     hourly background poll uses) and redirects back to `/`.
 
 Set `PORT` to change the port, e.g. `PORT=4000 npm start`.
+
+### Playwright-assisted apply
+
+```bash
+npm run apply -- <listing-id>
+```
+
+Grab a listing id from the dashboard or straight from SQLite:
+
+```bash
+sqlite3 data/listings.sqlite "select id, company, title from listings where status='candidate' limit 20;"
+```
+
+What it does:
+
+1. Looks the listing up in the local DB (warns — but proceeds — if you've
+   already applied/dismissed it) and loads + validates `config/profile.json`.
+2. Opens the listing's application page in a **headed** browser
+   (`playwright.config.ts` — the browser is always visible, never headless).
+3. Detects the ATS by hostname — **Greenhouse** (`job-boards.greenhouse.io`,
+   `boards.greenhouse.io`) and **Lever** (`jobs.lever.co`) have real handlers;
+   everything else (Workday, iCIMS, custom sites, ...) falls back to "page is
+   open, fill it in yourself".
+4. Fills the fields that map directly to your profile (name, email, phone,
+   location, links, resume upload) and prints a summary of what was filled
+   vs skipped. Free-text questions ("Why do you want to work here?") are
+   **always left blank** — nothing is ever written on your behalf — and
+   EEO / voluntary self-identification questions (gender, race/ethnicity,
+   veteran or disability status) are **never touched**, period.
+5. Pauses. You review, complete, and — only if it looks right — submit the
+   form yourself in the browser. There is no auto-submit anywhere.
+6. After you press Enter in the terminal, it asks whether to mark the listing
+   `applied` in the local DB.
+
+The handler test suite (local HTML fixtures, no network) runs with:
+
+```bash
+npm run test:ats
+```
 
 ### One-off CLI scan
 
@@ -97,11 +150,15 @@ src/
   matching/     filters.yaml loader + matcher
   db/           SQLite store + schema
   core/         shared scan/match orchestration used by both entry points
+  ats/          per-ATS Playwright form-filling handlers + profile loader
   web/          server-rendered HTML views (no frontend build step)
-  cli/          scan entry point (npm run scan)
+  cli/          scan + apply entry points (npm run scan / npm run apply)
   server.ts     Express app + hourly background poll (npm start)
-config/         filters.example.yaml (copy to filters.yaml)
+config/         filters.example.yaml / profile.example.json (copy + edit)
+test/fixtures/  local static HTML pages the ATS handler tests run against
+scripts/        test-ats-fixtures.ts (npm run test:ats)
 data/           gitignored — the SQLite DB lives here at runtime, purely local
+resumes/        gitignored — your resume PDF(s) live here, purely local
 ```
 
 This is a fully local app: nothing here talks to git, GitHub Actions, or any
@@ -109,29 +166,42 @@ CI system, and no data is ever auto-committed anywhere.
 
 ## Roadmap
 
-- **Phase 1 (this)** — scan, dedupe, filter, store, and a local review website
+- **Phase 1 (done)** — scan, dedupe, filter, store, and a local review website
   (apply/decline/history).
-- **Phase 2** — Playwright-assisted form filling for known ATS platforms
-  (Greenhouse, Lever, Workday), with a manual-mode fallback for everything
-  else. `playwright.config.ts` is a stub for this; `src/ats/` does not exist
-  yet and this phase does not open a browser automatically anywhere.
-- **Phase 3** — application-history export and further polish.
+- **Phase 2 (this)** — Playwright-assisted form filling for Greenhouse and
+  Lever (`npm run apply -- <id>`), with a manual-mode fallback for everything
+  else. The dashboard's Apply button is unchanged — it still just marks status;
+  the browser flow is a separate CLI command.
+- **Phase 3** — a Workday handler (multi-step wizard, deliberately deferred),
+  application-history export, and further polish.
 
-## Ethical use
+## Ethical use & limitations
 
 This is a personal tool for managing **your own** job applications:
 
 - Be gentle with the source repos: they are community-maintained and fetched
   from raw GitHub. The hourly background poll is deliberately infrequent —
   don't lower the interval into a tight loop.
-- Phase 2 will **never** bypass CAPTCHAs or evade bot detection — if a site
-  challenges, the human takes over.
-- Phase 2 will default to **fill-then-manual-review**: the browser stops
-  before the submit button so you check every application before it goes to a
-  real employer. No auto-submit. This phase (Phase 1) doesn't even open a
-  browser automatically — the Apply button on the dashboard just links out to
-  the real posting for you to apply by hand.
-- No personal data belongs in this repo. Profile/resume data (Phase 2) will
-  live in gitignored local files, and only `*.example.*` templates are ever
-  committed. `data/listings.sqlite` (public, non-sensitive listing metadata)
-  stays local too — it is gitignored, not committed by anything.
+- The apply flow **never** bypasses CAPTCHAs or evades bot detection — if a
+  site challenges, the human takes over.
+- **No auto-submit, anywhere.** The flow is fill-then-pause: the browser is
+  headed, the handler never clicks submit, and you review and submit every
+  application by hand before it reaches a real employer.
+- Free-text answers are never generated on your behalf, and EEO / voluntary
+  self-identification questions (gender, race/ethnicity, veteran status,
+  disability status) are never auto-answered — `profile.json` deliberately
+  doesn't even have fields for them, and the fill helpers hard-refuse any
+  field whose label looks like one.
+- **Live-verification caveat**: the Greenhouse and Lever handlers use
+  Playwright's accessible-name locators (labels, not brittle CSS ids) and are
+  tested against local HTML fixtures mirroring those platforms' well-known
+  field labels — but they have **not** been verified against live production
+  postings from within the development environment this was built in (its
+  network policy blocks those hosts). Do one supervised trial run against a
+  real posting — watching every step — before trusting the flow for anything
+  that matters. If a field doesn't fill, it lands in the "skipped" list and
+  you fill it by hand; the handler never guesses.
+- No personal data belongs in this repo. `config/profile.json` and `resumes/`
+  are gitignored; only `*.example.*` templates are ever committed.
+  `data/listings.sqlite` (public, non-sensitive listing metadata) stays local
+  too — it is gitignored, not committed by anything.

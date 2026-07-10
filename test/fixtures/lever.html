@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Software Engineer Intern — Acme Corp (Lever fixture)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, select, textarea { display: block; width: 100%; padding: 6px; margin-top: 4px; }
+    fieldset { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <!--
+    Local test fixture mirroring the stable field labels (and name=
+    attributes) of a Lever application form (jobs.lever.co). Uses proper
+    <label for> associations so getByLabel() has something real to match.
+    This tests the fill logic, not today's exact production markup.
+  -->
+  <h1>Software Engineer Intern</h1>
+  <h2>Submit your application</h2>
+
+  <form>
+    <label for="name">Full name *</label>
+    <input type="text" id="name" name="name">
+
+    <label for="email">Email *</label>
+    <input type="email" id="email" name="email">
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone">
+
+    <label for="location">Current location</label>
+    <input type="text" id="location" name="location">
+
+    <label for="org">Current company</label>
+    <input type="text" id="org" name="org">
+
+    <label for="resume-upload">Resume/CV *</label>
+    <input type="file" id="resume-upload" name="resume">
+
+    <h3>Links</h3>
+    <label for="url-linkedin">LinkedIn URL</label>
+    <input type="text" id="url-linkedin" name="urls[LinkedIn]">
+
+    <label for="url-github">GitHub URL</label>
+    <input type="text" id="url-github" name="urls[GitHub]">
+
+    <!-- No Portfolio field on this posting: the handler must record a skip, not crash -->
+
+    <label for="comments">Additional information</label>
+    <textarea id="comments" name="comments" rows="4"></textarea>
+
+    <!-- EEO / demographic survey: must NEVER be auto-filled -->
+    <fieldset>
+      <legend>U.S. Equal Employment Opportunity information (voluntary)</legend>
+
+      <label for="eeo-gender">Gender</label>
+      <select id="eeo-gender" name="eeo[gender]">
+        <option value=""></option>
+        <option value="female">Female</option>
+        <option value="male">Male</option>
+      </select>
+
+      <label for="eeo-race">Race/Ethnicity</label>
+      <select id="eeo-race" name="eeo[race]">
+        <option value=""></option>
+        <option value="decline">Decline to self-identify</option>
+      </select>
+
+      <label for="eeo-veteran">Veteran status</label>
+      <select id="eeo-veteran" name="eeo[veteran]">
+        <option value=""></option>
+        <option value="not">I am not a protected veteran</option>
+      </select>
+    </fieldset>
+
+    <button type="submit">Submit application</button>
+  </form>
+</body>
+</html>

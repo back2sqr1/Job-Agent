@@ -119,6 +119,14 @@ export class Store {
     return result.changes > 0;
   }
 
+  /** Single listing by id, or null if no such row. Used by `npm run apply`. */
+  getById(id: string): StoredListing | null {
+    const row = this.db.prepare('SELECT * FROM listings WHERE id = ?').get(id) as
+      | ListingRow
+      | undefined;
+    return row ? rowToStoredListing(row) : null;
+  }
+
   getByStatus(status: ListingStatus): Listing[] {
     return this.getByStatusWithMeta(status);
   }
