@@ -57,6 +57,9 @@ function layout(title: string, activeNav: 'dashboard' | 'history', body: string)
   .status-tag { font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid #8886; }
   .status-tag.applied { color: #2a8f4b; border-color: #2a8f4b; }
   .status-tag.dismissed { color: #b3403a; border-color: #b3403a; }
+  .type-tag { font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid #8886; white-space: nowrap; }
+  .type-tag.new-grad { color: #3a6fb0; border-color: #3a6fb0; }
+  .type-tag.internship { color: #9a6a1f; border-color: #9a6a1f; }
 </style>
 </head>
 <body>
@@ -72,12 +75,18 @@ ${body}
 </html>`;
 }
 
+function typeTag(l: StoredListing): string {
+  const cls = l.positionType === 'Internship' ? 'internship' : 'new-grad';
+  return `<span class="type-tag ${cls}">${escapeHtml(l.positionType)}</span>`;
+}
+
 function listingRow(l: StoredListing, actions: string): string {
   const locations = l.locations.length ? escapeHtml(l.locations.join('; ')) : '—';
   const terms = l.terms.length ? escapeHtml(l.terms.join(', ')) : '—';
   return `<tr>
   <td>${escapeHtml(l.company)}</td>
   <td>${escapeHtml(l.title)}</td>
+  <td>${typeTag(l)}</td>
   <td>${locations}</td>
   <td>${terms}</td>
   <td class="muted">${fmtDate(l.datePosted)}</td>
@@ -114,7 +123,7 @@ export function renderDashboard(candidates: StoredListing[], flash?: string): st
     body += `<div class="source-group">
   <h2>${escapeHtml(SOURCE_LABELS[source] ?? source)} <span class="muted">(${items.length})</span></h2>
   <table>
-    <thead><tr><th>Company</th><th>Title</th><th>Location</th><th>Term</th><th>Posted</th><th>Link</th><th>Action</th></tr></thead>
+    <thead><tr><th>Company</th><th>Title</th><th>Type</th><th>Location</th><th>Term</th><th>Posted</th><th>Link</th><th>Action</th></tr></thead>
     <tbody>
       ${items
         .map((l) =>
@@ -146,7 +155,7 @@ export function renderHistory(applied: StoredListing[], dismissed: StoredListing
     applied.length === 0
       ? '<p class="empty">Nothing marked applied yet.</p>'
       : `<table>
-    <thead><tr><th>Company</th><th>Title</th><th>Location</th><th>Term</th><th>Posted</th><th>Link</th><th></th></tr></thead>
+    <thead><tr><th>Company</th><th>Title</th><th>Type</th><th>Location</th><th>Term</th><th>Posted</th><th>Link</th><th></th></tr></thead>
     <tbody>
       ${applied.map((l) => listingRow(l, `<span class="status-tag applied">applied</span>`)).join('\n')}
     </tbody>
@@ -160,7 +169,7 @@ export function renderHistory(applied: StoredListing[], dismissed: StoredListing
     dismissed.length === 0
       ? '<p class="empty">Nothing declined yet.</p>'
       : `<table>
-    <thead><tr><th>Company</th><th>Title</th><th>Location</th><th>Term</th><th>Posted</th><th>Link</th><th></th></tr></thead>
+    <thead><tr><th>Company</th><th>Title</th><th>Type</th><th>Location</th><th>Term</th><th>Posted</th><th>Link</th><th></th></tr></thead>
     <tbody>
       ${dismissed.map((l) => listingRow(l, `<span class="status-tag dismissed">declined</span>`)).join('\n')}
     </tbody>

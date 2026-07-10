@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { Listing, ListingSource } from '../scrapers/types';
+import { Listing, ListingSource, PositionType } from '../scrapers/types';
 
 export type ListingStatus = 'new' | 'candidate' | 'dismissed' | 'queued' | 'applied';
 
@@ -23,6 +23,7 @@ export interface StoredListing extends Listing {
 interface ListingRow {
   id: string;
   source: string;
+  position_type: string;
   company: string;
   title: string;
   url: string;
@@ -51,6 +52,22 @@ export class Store {
     this.db.pragma('journal_mode = WAL');
     const schema = readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
     this.db.exec(schema);
+    this.migrate();
+  }
+
+  /**
+   * `CREATE TABLE IF NOT EXISTS` in schema.sql only helps on a brand-new
+   * database — it does nothing for columns added to the schema after a
+   * database file already exists (as happened here: position_type was added
+   * later). Add any such columns by hand so existing users' data isn't lost.
+   */
+  private migrate(): void {
+    const columns = (this.db.prepare('PRAGMA table_info(listings)').all() as { name: string }[]).map(
+      (c) => c.name,
+    );
+    if (!columns.includes('position_type')) {
+      this.db.exec(`ALTER TABLE listings ADD COLUMN position_type TEXT NOT NULL DEFAULT ''`);
+    }
   }
 
   /** Insert unseen listings; for already-seen ones just bump last_seen_at. */
@@ -58,12 +75,12 @@ export class Store {
     const now = Math.floor(Date.now() / 1000);
     const insert = this.db.prepare(`
       INSERT INTO listings
-        (id, source, company, title, url, locations, terms, sponsorship,
+        (id, source, position_type, company, title, url, locations, terms, sponsorship,
          category, date_posted, status, first_seen_at, last_seen_at)
       VALUES
-        (@id, @source, @company, @title, @url, @locations, @terms, @sponsorship,
+        (@id, @source, @positionType, @company, @title, @url, @locations, @terms, @sponsorship,
          @category, @datePosted, 'new', @now, @now)
-      ON CONFLICT (id) DO UPDATE SET last_seen_at = @now
+      ON CONFLICT (id) DO UPDATE SET last_seen_at = @now, position_type = @positionType
     `);
     const exists = this.db.prepare('SELECT 1 FROM listings WHERE id = ?');
 
@@ -76,6 +93,7 @@ export class Store {
         insert.run({
           id: l.id,
           source: l.source,
+          positionType: l.positionType,
           company: l.company,
           title: l.title,
           url: l.url,
@@ -141,6 +159,7 @@ function rowToListing(row: ListingRow): Listing {
   return {
     id: row.id,
     source: row.source as ListingSource,
+    positionType: (row.position_type || 'New Grad') as PositionType,
     company: row.company,
     title: row.title,
     url: row.url,

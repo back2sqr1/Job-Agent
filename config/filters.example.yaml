@@ -53,3 +53,16 @@ require_sponsorship: false
 
 # Companies you never want surfaced (exact name, case-insensitive).
 company_blocklist: []
+
+# Which position types to show. Every listing is classified as "New Grad" or
+# "Internship" (from its title, falling back to what its source repo usually
+# means — see src/scrapers/classify.ts). Leave empty to show both.
+position_types: []
+# position_types:
+#   - New Grad
+#   - Internship
+
+# If true, only show listings with a recognizably-US location (a "City, ST"
+# US state, "USA"/"United States", or a bare "Remote" with no country).
+# Listings with no location info at all still pass through either way.
+us_only: false

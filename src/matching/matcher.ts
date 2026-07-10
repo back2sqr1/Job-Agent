@@ -1,5 +1,6 @@
 import { Listing } from '../scrapers/types';
 import { FilterConfig } from './filterConfig';
+import { isUSLocation } from './usLocations';
 
 /**
  * Sponsorship values (from the Simplify data + the sndsh404 emoji
@@ -17,6 +18,12 @@ export function matches(listing: Listing, config: FilterConfig): boolean {
   // Company blocklist (exact, case-insensitive).
   const company = listing.company.toLowerCase();
   if (config.companyBlocklist.some((c) => c.toLowerCase() === company)) return false;
+
+  // Position type (New Grad / Internship).
+  if (config.positionTypes.length > 0) {
+    const wanted = config.positionTypes.map((t) => t.toLowerCase());
+    if (!wanted.includes(listing.positionType.toLowerCase())) return false;
+  }
 
   // Terms: listings without term tags always pass (some sources don't tag).
   if (config.terms.length > 0 && listing.terms.length > 0) {
@@ -52,6 +59,11 @@ export function matches(listing: Listing, config: FilterConfig): boolean {
       config.locationsAllow.some((a) => loc.includes(a.toLowerCase())),
     );
     if (!allowed) return false;
+  }
+
+  // US-only: reject if the listing has locations and none of them are US.
+  if (config.usOnly && listing.locations.length > 0) {
+    if (!listing.locations.some((loc) => isUSLocation(loc))) return false;
   }
 
   // Sponsorship requirement.

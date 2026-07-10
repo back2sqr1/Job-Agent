@@ -5,6 +5,13 @@ export type ListingSource =
   | 'sndsh-summer2027';
 
 /**
+ * What kind of role this is, independent of which repo it came from — all
+ * three repos occasionally carry both (e.g. a co-op inside the New-Grad
+ * repo). See src/scrapers/classify.ts for how this gets decided.
+ */
+export type PositionType = 'New Grad' | 'Internship';
+
+/**
  * Normalized listing shape used everywhere downstream of the scrapers,
  * regardless of what the upstream source looks like.
  */
@@ -16,6 +23,7 @@ export interface Listing {
    */
   id: string;
   source: ListingSource;
+  positionType: PositionType;
   company: string;
   title: string;
   /** Direct application URL (points at the company's ATS). */

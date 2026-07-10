@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS listings (
   id            TEXT PRIMARY KEY,           -- upstream UUID (Simplify) or content hash (sndsh404)
   source        TEXT NOT NULL,              -- 'simplify-newgrad' | 'simplify-summer2026' | 'sndsh-summer2027'
+  position_type TEXT NOT NULL DEFAULT '',   -- 'New Grad' | 'Internship'
   company       TEXT NOT NULL,
   title         TEXT NOT NULL,
   url           TEXT NOT NULL,

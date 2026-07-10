@@ -21,6 +21,7 @@ export const SCRAPERS: Scraper[] = [
     source: 'simplify-newgrad',
     // Active entries in this repo currently carry no term tags, so no
     // term filter here — active + visible is the meaningful cut.
+    defaultPositionType: 'New Grad',
   }),
   new SimplifyRepoScraper({
     repoSlug: 'SimplifyJobs/Summer2026-Internships',
@@ -38,6 +39,7 @@ export const SCRAPERS: Scraper[] = [
       'Winter 2027',
       'Spring 2027',
     ],
+    defaultPositionType: 'Internship',
   }),
   new SndshReadmeScraper(),
 ];

@@ -27,6 +27,18 @@ export interface FilterConfig {
   requireSponsorship: boolean;
   /** Companies to never surface (case-insensitive exact match). */
   companyBlocklist: string[];
+  /**
+   * Position types to accept, e.g. ["New Grad"] or ["Internship"]. Empty
+   * (the default) means both. See src/scrapers/classify.ts for how a
+   * listing's type is decided.
+   */
+  positionTypes: string[];
+  /**
+   * If true, only keep listings with at least one recognizably-US location
+   * (see src/matching/usLocations.ts for the heuristic). Listings with no
+   * location info always pass, same as the allow/deny lists above.
+   */
+  usOnly: boolean;
 }
 
 export const DEFAULT_CONFIG: FilterConfig = {
@@ -37,6 +49,8 @@ export const DEFAULT_CONFIG: FilterConfig = {
   locationsDeny: [],
   requireSponsorship: false,
   companyBlocklist: [],
+  positionTypes: [],
+  usOnly: false,
 };
 
 export class FilterConfigError extends Error {}
@@ -71,6 +85,8 @@ export function loadFilterConfig(filePath: string): FilterConfig | null {
     'locations_deny',
     'require_sponsorship',
     'company_blocklist',
+    'position_types',
+    'us_only',
   ];
   for (const key of Object.keys(obj)) {
     if (!known.includes(key)) {
@@ -88,6 +104,8 @@ export function loadFilterConfig(filePath: string): FilterConfig | null {
     locationsDeny: stringList(obj, 'locations_deny', filePath),
     requireSponsorship: bool(obj, 'require_sponsorship', filePath),
     companyBlocklist: stringList(obj, 'company_blocklist', filePath),
+    positionTypes: stringList(obj, 'position_types', filePath),
+    usOnly: bool(obj, 'us_only', filePath),
   };
 }
 

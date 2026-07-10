@@ -1,4 +1,5 @@
-import { Listing, ListingSource, Scraper } from './types';
+import { classifyPositionType } from './classify';
+import { Listing, ListingSource, PositionType, Scraper } from './types';
 
 /**
  * Raw entry shape in the SimplifyJobs listings.json files.
@@ -29,6 +30,8 @@ export interface SimplifyRepoOptions {
    * repos (e.g. New-Grad-Positions) leave `terms` empty on active entries.
    */
   termFilter?: string[];
+  /** What this repo's listings are assumed to be, absent a title override. */
+  defaultPositionType: PositionType;
 }
 
 /**
@@ -44,12 +47,14 @@ export class SimplifyRepoScraper implements Scraper {
   readonly source: ListingSource;
   private readonly url: string;
   private readonly termFilter: string[];
+  private readonly defaultPositionType: PositionType;
 
   constructor(opts: SimplifyRepoOptions) {
     this.name = opts.repoSlug;
     this.source = opts.source;
     this.url = `https://raw.githubusercontent.com/${opts.repoSlug}/dev/.github/scripts/listings.json`;
     this.termFilter = opts.termFilter ?? [];
+    this.defaultPositionType = opts.defaultPositionType;
   }
 
   async fetch(): Promise<Listing[]> {
@@ -76,6 +81,7 @@ export class SimplifyRepoScraper implements Scraper {
       out.push({
         id: entry.id,
         source: this.source,
+        positionType: classifyPositionType(entry.title.trim(), this.defaultPositionType),
         company: entry.company_name.trim(),
         title: entry.title.trim(),
         url: entry.url.trim(),
