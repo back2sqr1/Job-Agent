@@ -1,0 +1,24 @@
+{
+  "name": "job-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal job-listing tracker: scans community-maintained internship/new-grad repos, dedupes into SQLite, and filters against your own criteria.",
+  "license": "MIT",
+  "scripts": {
+    "scan": "tsx src/cli/scan.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "js-yaml": "^4.1.0",
+    "playwright": "^1.53.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}

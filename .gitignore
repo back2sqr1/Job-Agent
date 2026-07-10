@@ -1,0 +1,24 @@
+# Dependencies / build output
+node_modules/
+dist/
+
+# Runtime data — the SQLite DB lives here, never commit it
+data/*
+!data/.gitkeep
+
+# Personal config — only the *.example.* templates are tracked
+config/filters.yaml
+config/profile.json
+
+# Resume files (Phase 2) — never commit real documents
+resumes/
+
+# Secrets / environment
+.env
+.env.*
+
+# Stray sqlite files anywhere
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm

@@ -1,0 +1,55 @@
+# Job-Agent filter config
+# ------------------------
+# Copy this file to config/filters.yaml and edit it — filters.yaml is
+# gitignored, so your personal criteria never get committed.
+#
+# Every list is optional. An empty or omitted list means "no constraint".
+# All string matching is case-insensitive.
+
+# Terms to accept. Listings that carry no term tags at all (the New-Grad
+# repo leaves terms empty) always pass this check, so this mainly narrows
+# the internship sources.
+# Known values in the live data: "Summer 2026", "Fall 2026", "Winter 2026",
+# "Spring 2027", "Summer 2027", ...
+terms:
+  - Summer 2026
+  - Summer 2027
+
+# At least one of these substrings must appear in the listing's
+# title or category for it to become a candidate.
+include_keywords:
+  - software
+  - swe
+  - backend
+  - full stack
+  - fullstack
+  - machine learning
+  - ai
+
+# Listings whose title/category contains any of these are rejected,
+# even if an include keyword also matched.
+exclude_keywords:
+  - unpaid
+  - staff
+  - senior
+  - principal
+
+# Location allow-list (substring match against each listing location).
+# Leave empty to accept any location. Listings with no location info
+# always pass.
+locations_allow:
+  - Remote
+  - New York
+  - San Francisco
+  - Seattle
+
+# Location deny-list — a listing is rejected only if ALL of its locations
+# match a deny entry.
+locations_deny: []
+
+# If true, drop listings whose sponsorship field says the employer does
+# not sponsor visas or requires citizenship / a security clearance.
+require_sponsorship: false
+
+# Companies you never want surfaced (exact name, case-insensitive).
+company_blocklist: []
