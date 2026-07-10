@@ -13,6 +13,13 @@ export interface UpsertResult {
   alreadySeen: number;
 }
 
+/** A stored listing plus the bookkeeping columns the UI wants to show. */
+export interface StoredListing extends Listing {
+  status: ListingStatus;
+  firstSeenAt: number;
+  lastSeenAt: number;
+}
+
 interface ListingRow {
   id: string;
   source: string;
@@ -88,15 +95,34 @@ export class Store {
     return { inserted, alreadySeen };
   }
 
-  setStatus(id: string, status: ListingStatus): void {
-    this.db.prepare('UPDATE listings SET status = ? WHERE id = ?').run(status, id);
+  /** Returns true if a row with this id existed and was updated. */
+  setStatus(id: string, status: ListingStatus): boolean {
+    const result = this.db.prepare('UPDATE listings SET status = ? WHERE id = ?').run(status, id);
+    return result.changes > 0;
   }
 
   getByStatus(status: ListingStatus): Listing[] {
+    return this.getByStatusWithMeta(status);
+  }
+
+  /** Same as getByStatus but includes status/timestamps, for the review UI. */
+  getByStatusWithMeta(status: ListingStatus): StoredListing[] {
     const rows = this.db
       .prepare('SELECT * FROM listings WHERE status = ? ORDER BY date_posted DESC')
       .all(status) as ListingRow[];
-    return rows.map(rowToListing);
+    return rows.map(rowToStoredListing);
+  }
+
+  /** Rows in any of the given statuses, most-recently-updated first. */
+  getByStatuses(statuses: ListingStatus[]): StoredListing[] {
+    if (statuses.length === 0) return [];
+    const placeholders = statuses.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM listings WHERE status IN (${placeholders}) ORDER BY last_seen_at DESC`,
+      )
+      .all(...statuses) as ListingRow[];
+    return rows.map(rowToStoredListing);
   }
 
   countByStatus(status: ListingStatus): number {
@@ -123,6 +149,15 @@ function rowToListing(row: ListingRow): Listing {
     sponsorship: row.sponsorship ?? undefined,
     category: row.category ?? undefined,
     datePosted: row.date_posted,
+  };
+}
+
+function rowToStoredListing(row: ListingRow): StoredListing {
+  return {
+    ...rowToListing(row),
+    status: row.status as ListingStatus,
+    firstSeenAt: row.first_seen_at,
+    lastSeenAt: row.last_seen_at,
   };
 }
 
