@@ -60,7 +60,8 @@ function layout(title: string, activeNav: 'dashboard' | 'history', body: string)
   .type-tag { font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid #8886; white-space: nowrap; }
   .type-tag.new-grad { color: #3a6fb0; border-color: #3a6fb0; }
   .type-tag.internship { color: #9a6a1f; border-color: #9a6a1f; }
-  .apply-cmd { font-size: 0.7rem; word-break: break-all; background: #8881; padding: 0.2rem 0.35rem; border-radius: 3px; display: inline-block; user-select: all; }
+  button.copy-btn { font-size: 0.8rem; white-space: nowrap; }
+  button.copy-btn.copied { border-color: #2a8f4b; color: #2a8f4b; }
 </style>
 </head>
 <body>
@@ -72,6 +73,24 @@ function layout(title: string, activeNav: 'dashboard' | 'history', body: string)
   </nav>
 </header>
 ${body}
+<script>
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  var cmd = btn.getAttribute('data-cmd');
+  navigator.clipboard.writeText(cmd).then(function () {
+    var original = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1500);
+  }).catch(function () {
+    btn.textContent = 'Copy failed';
+  });
+});
+</script>
 </body>
 </html>`;
 }
@@ -92,7 +111,7 @@ function listingRow(l: StoredListing, actions: string): string {
   <td>${terms}</td>
   <td class="muted">${fmtDate(l.datePosted)}</td>
   <td><a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">Open posting →</a></td>
-  <td><code class="apply-cmd">npm run apply -- ${escapeHtml(l.id)}</code></td>
+  <td><button type="button" class="copy-btn" data-cmd="${escapeHtml(`npm run apply -- ${l.id}`)}">Copy apply command</button></td>
   <td class="actions">${actions}</td>
 </tr>`;
 }
