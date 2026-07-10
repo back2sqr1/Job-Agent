@@ -24,6 +24,12 @@ async function main(): Promise<void> {
 
   const suffix = summary.failures > 0 ? ` (${summary.failures} source(s) failed)` : '';
   console.log(`\n${summary.totalNew} new, ${summary.totalCandidates} candidates${suffix}`);
+  if (summary.promotedFromBacklog > 0 || summary.demotedToBacklog > 0) {
+    console.log(
+      `Backlog re-check against current filters.yaml: ` +
+        `${summary.promotedFromBacklog} promoted to candidate, ${summary.demotedToBacklog} moved back to new`,
+    );
+  }
 }
 
 main().catch((err) => {

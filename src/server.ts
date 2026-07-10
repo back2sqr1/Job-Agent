@@ -23,6 +23,8 @@ async function scanOnce(label: string): Promise<ScanSummary> {
       lastScanAt = Math.floor(Date.now() / 1000);
       console.log(
         `[scan] ${label}: done — ${summary.totalNew} new, ${summary.totalCandidates} candidates` +
+          (summary.promotedFromBacklog > 0 ? `, +${summary.promotedFromBacklog} promoted from backlog` : '') +
+          (summary.demotedToBacklog > 0 ? `, -${summary.demotedToBacklog} demoted back to new` : '') +
           (summary.failures > 0 ? ` (${summary.failures} source(s) failed)` : ''),
       );
       for (const err of summary.errors) console.error(`[scan] ${label}: ${err}`);
@@ -52,6 +54,9 @@ app.get('/', (_req, res) => {
   const flash = lastScanAt
     ? `Last scan: ${new Date(lastScanAt * 1000).toLocaleString()} — ` +
       `${lastScanSummary?.totalNew ?? 0} new, ${lastScanSummary?.totalCandidates ?? 0} candidates` +
+      (lastScanSummary && lastScanSummary.promotedFromBacklog > 0
+        ? ` (+${lastScanSummary.promotedFromBacklog} promoted from backlog after your filters.yaml changes)`
+        : '') +
       (lastScanSummary && lastScanSummary.failures > 0
         ? ` (${lastScanSummary.failures} source(s) failed)`
         : '')

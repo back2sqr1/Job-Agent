@@ -55,6 +55,16 @@ export interface ScanSummary {
   }[];
   errors: string[];
   newCandidates: Listing[];
+  /**
+   * Previously-seen listings (status 'new' or 'candidate') that were
+   * re-evaluated against the *current* filters.yaml this run. Because
+   * upstream repos publish thousands of listings, most of a scan's
+   * "new" rows never get looked at again once inserted — without this,
+   * editing config/filters.yaml only ever affects listings fetched
+   * *after* the edit, never the backlog already sitting in the DB.
+   */
+  promotedFromBacklog: number;
+  demotedToBacklog: number;
 }
 
 /**
@@ -84,8 +94,35 @@ export function loadConfigOrDefault(): { config: FilterConfig; warning?: string 
 }
 
 /**
- * Fetch all three sources, upsert into SQLite (dedupe by id/hash), run the
- * matcher over newly-inserted rows, and return a summary. Shared by the CLI
+ * Re-run the matcher against every listing still sitting in 'new' or
+ * 'candidate' status (i.e. everything the user hasn't applied/declined yet),
+ * promoting newly-matching rows and demoting ones that no longer match. This
+ * is what makes editing config/filters.yaml actually take effect on listings
+ * that were already fetched in a previous scan, not just brand-new ones.
+ * Rows the user has already acted on ('applied'/'dismissed'/'queued') are
+ * left alone — this never overrides a human decision.
+ */
+function reconcileBacklog(store: Store, config: FilterConfig): { promoted: number; demoted: number } {
+  const rows = store.getByStatuses(['new', 'candidate']);
+  let promoted = 0;
+  let demoted = 0;
+  for (const row of rows) {
+    const isMatch = matches(row, config);
+    if (isMatch && row.status !== 'candidate') {
+      store.setStatus(row.id, 'candidate');
+      promoted += 1;
+    } else if (!isMatch && row.status !== 'new') {
+      store.setStatus(row.id, 'new');
+      demoted += 1;
+    }
+  }
+  return { promoted, demoted };
+}
+
+/**
+ * Fetch all three sources, upsert into SQLite (dedupe by id/hash), then
+ * re-run the matcher over both newly-inserted rows AND the existing backlog
+ * (see reconcileBacklog above), and return a summary. Shared by the CLI
  * (`npm run scan`), the server's hourly background poll, and the `/refresh`
  * route so there is exactly one implementation of "what a scan does".
  */
@@ -114,6 +151,8 @@ export async function runScan(): Promise<ScanSummary> {
     perSource: [],
     errors,
     newCandidates: [],
+    promotedFromBacklog: 0,
+    demotedToBacklog: 0,
   };
 
   if (fetched.length === 0) {
@@ -143,6 +182,11 @@ export async function runScan(): Promise<ScanSummary> {
         alreadySeen,
       });
     }
+
+    const { promoted, demoted } = reconcileBacklog(store, config);
+    summary.promotedFromBacklog = promoted;
+    summary.demotedToBacklog = demoted;
+    summary.totalCandidates += promoted;
   } finally {
     store.close();
   }
