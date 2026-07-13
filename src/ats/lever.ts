@@ -1,5 +1,12 @@
 import type { Page } from 'playwright';
-import { countBlankTextareas, customQuestionNote, fillField, uploadResume } from './helpers';
+import {
+  countBlankTextareas,
+  customQuestionNote,
+  fillAutocomplete,
+  fillField,
+  toStateAbbreviation,
+  uploadResume,
+} from './helpers';
 import type { Profile } from './profile';
 import { AtsHandler, FillResult, emptyResult } from './types';
 
@@ -58,14 +65,16 @@ export const lever: AtsHandler = {
       },
       result,
     );
-    await fillField(
+    // Confirmed live: Lever's "Current Location" is a custom autocomplete —
+    // typing shows a <div class="dropdown-location"> suggestion list that
+    // must be clicked; plain typed text alone isn't recognized as selected.
+    await fillAutocomplete(
       page,
-      {
-        field: 'Current Location',
-        labels: [/current\s*location/i, /^\s*location/i],
-        fallbackSelectors: ['input[name="location"]'],
-        value: `${profile.city}, ${profile.state}`,
-      },
+      page.locator('input[name="location"], #location-input').first(),
+      profile.city,
+      '.dropdown-location',
+      toStateAbbreviation(profile.state),
+      'Current Location',
       result,
     );
 

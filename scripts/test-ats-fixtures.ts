@@ -175,7 +175,14 @@ async function testLever(page: Page): Promise<void> {
   check('Full name filled (first + last)', (await value(page, '#name')) === 'Testy McTestface');
   check('Email filled', (await value(page, '#email')) === 'testy@example.com');
   check('Phone filled', (await value(page, '#phone')) === '555-000-1111');
-  check('Current location filled', (await value(page, '#location')) === 'Testville, TS');
+  check(
+    'Current location: state-matching suggestion picked, not just the first one',
+    (await value(page, '#location')) === 'Testville, TS, USA',
+  );
+  check(
+    'Current location: hidden selectedLocation set via click (not just typed text)',
+    (await value(page, '#selected-location')) === 'Testville, TS, USA',
+  );
   check('Current company left blank (no profile mapping)', (await value(page, '#org')) === '');
 
   const resume = await attachedFile(page, '#resume-upload');

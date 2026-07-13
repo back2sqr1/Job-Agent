@@ -243,6 +243,79 @@ export async function fillCombobox(
   return false;
 }
 
+const STATE_ABBREVIATIONS: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO',
+  montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH',
+  oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT',
+  virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY',
+};
+
+/**
+ * Converts a full US state name (e.g. "Texas") to its 2-letter abbreviation
+ * ("TX"). Passes anything not recognized straight through unchanged (already
+ * an abbreviation, or a non-US region) — used to match location-autocomplete
+ * suggestions, which tend to show abbreviations, against a profile that
+ * might have the full name.
+ */
+export function toStateAbbreviation(state: string): string {
+  return STATE_ABBREVIATIONS[state.trim().toLowerCase()] ?? state;
+}
+
+/**
+ * Fill a custom (non-ARIA) autocomplete/typeahead: type into `input`, wait
+ * for `resultsSelector` to produce at least one match, click the one whose
+ * text contains `preferredText` (case-insensitive) if any does, otherwise
+ * click the first result rather than leaving it unset.
+ *
+ * Confirmed live on Lever: "Current Location" is a plain <div> results list
+ * (`.dropdown-location` rows, no ARIA role) that only registers a selection
+ * when a row is clicked — typed text alone doesn't populate Lever's hidden
+ * `selectedLocation` field. This is the same "type, wait for a real option,
+ * click it" principle as fillCombobox above, just for a widget with no ARIA
+ * semantics to hook into, so the results have to be found by a caller-given
+ * CSS selector instead of role="option".
+ */
+export async function fillAutocomplete(
+  page: Page,
+  input: Locator,
+  typedValue: string,
+  resultsSelector: string,
+  preferredText: string | null,
+  fieldName: string,
+  result: FillResult,
+): Promise<boolean> {
+  try {
+    await input.click({ timeout: 3_000 });
+    await input.fill(typedValue, { timeout: 3_000 });
+    const results = page.locator(resultsSelector);
+    await results.first().waitFor({ state: 'visible', timeout: 5_000 });
+
+    let target = results.first();
+    if (preferredText) {
+      const count = await results.count();
+      for (let i = 0; i < count; i++) {
+        const text = (await results.nth(i).textContent()) ?? '';
+        if (text.toLowerCase().includes(preferredText.toLowerCase())) {
+          target = results.nth(i);
+          break;
+        }
+      }
+    }
+    await target.click({ timeout: 3_000 });
+    result.filled.push(fieldName);
+    return true;
+  } catch {
+    result.skipped.push(fieldName);
+    return false;
+  }
+}
+
 /**
  * Count visible, still-empty <textarea>s — a decent proxy for free-text
  * custom questions ("Why do you want to work here?"), which are always left

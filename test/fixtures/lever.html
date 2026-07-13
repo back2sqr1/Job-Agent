@@ -32,6 +32,37 @@
 
     <label for="location">Current location</label>
     <input type="text" id="location" name="location">
+    <div class="dropdown-results"></div>
+    <input type="hidden" id="selected-location" name="selectedLocation" value="">
+    <script>
+      (function () {
+        // Mimics Lever's real location widget (confirmed live): a plain
+        // <div class="dropdown-location"> results list with no ARIA role,
+        // populated as you type, that only "selects" a location on click.
+        var input = document.getElementById('location');
+        var results = document.querySelector('.dropdown-results');
+        var hidden = document.getElementById('selected-location');
+        // Deliberately NOT in match-order, so the test proves the fill
+        // logic picks the state-matching row rather than just the first one.
+        var PLACES = ['Testville, ZZ, USA', 'Testville, TS, USA', 'Testville, QQ, CAN'];
+        input.addEventListener('input', function () {
+          var q = input.value.toLowerCase();
+          var matches = PLACES.filter(function (p) { return p.toLowerCase().indexOf(q) === 0; });
+          results.innerHTML = matches
+            .map(function (p, i) {
+              return '<div class="break-word dropdown-location width-full py1 px2" id="location-' + i + '">' + p + '</div>';
+            })
+            .join('');
+        });
+        results.addEventListener('click', function (e) {
+          if (e.target.classList.contains('dropdown-location')) {
+            hidden.value = e.target.textContent;
+            input.value = e.target.textContent;
+            results.innerHTML = '';
+          }
+        });
+      })();
+    </script>
 
     <label for="org">Current company</label>
     <input type="text" id="org" name="org">
