@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { countBlankTextareas, customQuestionNote, fillField, uploadResume } from './helpers';
+import { countBlankTextareas, customQuestionNote, fillCombobox, fillField, uploadResume } from './helpers';
 import type { Profile } from './profile';
 import { AtsHandler, FillResult, emptyResult } from './types';
 
@@ -59,6 +59,11 @@ export const greenhouse: AtsHandler = {
       { field: 'Phone', labels: [/phone/i], fallbackSelectors: ['#phone'], value: profile.phone },
       result,
     );
+    // The phone number's country code is often a separate react-select
+    // combobox next to the number itself (confirmed live on Greenhouse),
+    // not a plain <select> — needs the type-and-pick-option flow, not a
+    // plain fill.
+    await fillCombobox(page, [/^\s*country/i], profile.country, 'Country', result);
 
     await uploadResume(page, profile.resumePath, result);
 

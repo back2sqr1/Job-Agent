@@ -204,6 +204,46 @@ export async function uploadResume(
 }
 
 /**
+ * Fill a react-select-style searchable combobox (confirmed live on
+ * Greenhouse: a country-code picker next to the phone number field —
+ * `role="combobox"`, `aria-autocomplete="list"`, a plain-looking text input
+ * that filters a popup list of options as you type). These are deliberately
+ * excluded from the generic tryFillElement path (typing without picking an
+ * option from the list usually doesn't register with the page), so this
+ * does the real thing: type into the input to trigger the site's own
+ * filtering, wait for a matching option to actually appear, and click it —
+ * never just write the text and hope. Skips cleanly if no matching option
+ * shows up, rather than leaving the combobox in a half-typed state.
+ */
+export async function fillCombobox(
+  page: Page,
+  labels: RegExp[],
+  value: string,
+  fieldName: string,
+  result: FillResult,
+): Promise<boolean> {
+  for (const pattern of labels) {
+    const input = page.getByLabel(pattern).first();
+    try {
+      if ((await input.count()) === 0) continue;
+      await input.click({ timeout: 3_000 });
+      await input.fill(value, { timeout: 3_000 });
+      const option = page.getByRole('option', { name: value, exact: false }).first();
+      await option.waitFor({ state: 'visible', timeout: 3_000 });
+      await option.click({ timeout: 3_000 });
+      result.filled.push(fieldName);
+      return true;
+    } catch {
+      // This label matched an element, but it didn't behave like a
+      // fillable combobox (or no option ever appeared) — try the next
+      // label pattern before giving up.
+    }
+  }
+  result.skipped.push(fieldName);
+  return false;
+}
+
+/**
  * Count visible, still-empty <textarea>s — a decent proxy for free-text
  * custom questions ("Why do you want to work here?"), which are always left
  * for the human to answer. Used to add a heads-up note to the FillResult.

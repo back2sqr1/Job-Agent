@@ -33,6 +33,40 @@
     <label for="phone">Phone</label>
     <input type="tel" id="phone" name="job_application[phone]">
 
+    <!--
+      Mimics Greenhouse's real react-select country-code combobox: a plain
+      text input with role=combobox/aria-autocomplete=list, no native
+      <select>, that filters a popup list of role=option elements as you
+      type and only "selects" when one of those is clicked.
+    -->
+    <label id="country-label" for="country">Country</label>
+    <input type="text" id="country" role="combobox" aria-autocomplete="list"
+           aria-labelledby="country-label" aria-expanded="false" autocomplete="off">
+    <ul id="country-listbox" role="listbox" style="list-style: none; padding: 0; margin: 0;"></ul>
+    <input type="hidden" id="country-value" name="job_application[country]" value="">
+    <script>
+      (function () {
+        var input = document.getElementById('country');
+        var listbox = document.getElementById('country-listbox');
+        var hidden = document.getElementById('country-value');
+        var OPTIONS = ['United States', 'Canada', 'United Kingdom'];
+        input.addEventListener('input', function () {
+          var q = input.value.toLowerCase();
+          var matches = OPTIONS.filter(function (o) { return o.toLowerCase().indexOf(q) !== -1; });
+          listbox.innerHTML = matches
+            .map(function (o) { return '<li role="option">' + o + '</li>'; })
+            .join('');
+        });
+        listbox.addEventListener('click', function (e) {
+          if (e.target.matches('[role="option"]')) {
+            hidden.value = e.target.textContent;
+            input.value = e.target.textContent;
+            listbox.innerHTML = '';
+          }
+        });
+      })();
+    </script>
+
     <label for="resume">Resume/CV *</label>
     <input type="file" id="resume" name="job_application[resume]">
 

@@ -32,6 +32,15 @@ export interface Profile {
    * to an absolute path and verifies the file exists before returning.
    */
   resumePath: string;
+  /**
+   * e.g. "United States". Optional — defaults to "United States" if omitted,
+   * so existing profile.json files don't need to be edited just to pick this
+   * up. Used for country-code-style combobox fields next to phone number
+   * inputs (confirmed live on Greenhouse: a react-select combobox, not a
+   * plain <select>, so it needs its own fill path — see
+   * src/ats/helpers.ts#fillCountryCombobox).
+   */
+  country: string;
 }
 
 export class ProfileError extends Error {}
@@ -80,13 +89,17 @@ export function loadProfile(filePath: string = PROFILE_PATH): Profile {
   }
 
   const obj = doc as Record<string, unknown>;
-  const known: string[] = [...STRING_FIELDS, 'graduationYear'];
+  const known: string[] = [...STRING_FIELDS, 'graduationYear', 'country'];
   for (const key of Object.keys(obj)) {
     if (!known.includes(key)) {
       throw new ProfileError(
         `${filePath}: unknown key "${key}" (known keys: ${known.join(', ')})`,
       );
     }
+  }
+
+  if ('country' in obj && (typeof obj['country'] !== 'string' || (obj['country'] as string).trim() === '')) {
+    throw new ProfileError(`${filePath}: "country" must be a non-empty string if present`);
   }
 
   for (const key of STRING_FIELDS) {
@@ -132,5 +145,6 @@ export function loadProfile(filePath: string = PROFILE_PATH): Profile {
     github: obj['github'] as string,
     portfolio: obj['portfolio'] as string,
     resumePath,
+    country: (obj['country'] as string | undefined) ?? 'United States',
   };
 }

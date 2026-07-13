@@ -45,6 +45,7 @@ const profile: Profile = {
   github: 'https://github.com/testy',
   portfolio: 'https://testy.example.com',
   resumePath: RESUME,
+  country: 'United States',
 };
 
 const failures: string[] = [];
@@ -108,6 +109,10 @@ async function testGreenhouse(page: Page): Promise<void> {
   check('Last Name filled', (await value(page, '#last_name')) === 'McTestface');
   check('Email filled', (await value(page, '#email')) === 'testy@example.com');
   check('Phone filled', (await value(page, '#phone')) === '555-000-1111');
+  check(
+    'Country combobox filled by typing + clicking the matching option',
+    (await value(page, '#country-value')) === 'United States',
+  );
   check('Location filled', (await value(page, '#candidate-location')) === 'Testville, TS');
   check(
     'LinkedIn filled',
@@ -145,8 +150,8 @@ async function testGreenhouse(page: Page): Promise<void> {
   );
   check(
     'filled list looks right',
-    ['First Name', 'Last Name', 'Email', 'Phone', 'Resume', 'LinkedIn', 'School'].every((f) =>
-      result.filled.includes(f),
+    ['First Name', 'Last Name', 'Email', 'Phone', 'Country', 'Resume', 'LinkedIn', 'School'].every(
+      (f) => result.filled.includes(f),
     ),
   );
 

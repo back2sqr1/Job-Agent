@@ -12,5 +12,6 @@
   "linkedin": "https://www.linkedin.com/in/jane-doe",
   "github": "https://github.com/janedoe",
   "portfolio": "https://janedoe.example.com",
-  "resumePath": "resumes/your-resume.pdf"
+  "resumePath": "resumes/your-resume.pdf",
+  "country": "United States"
 }
