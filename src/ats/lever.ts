@@ -7,6 +7,7 @@ import {
   isCaptchaPresent,
   toStateAbbreviation,
   uploadResume,
+  waitForResumeParseToSettle,
 } from './helpers';
 import type { Profile } from './profile';
 import { AtsHandler, FillResult, emptyResult } from './types';
@@ -42,6 +43,27 @@ export const lever: AtsHandler = {
       result.notes.push(
         'A CAPTCHA / verification challenge is showing on this page — nothing was filled. ' +
           'Solve it yourself, then fill out the form by hand.',
+      );
+      return result;
+    }
+
+    // Upload the résumé FIRST and let any parse-and-autofill settle before
+    // touching anything else. Confirmed live (both Greenhouse and Lever):
+    // the ATS parses the PDF and auto-populates matching fields (name,
+    // email, phone, location, ...) a moment after upload — if those fields
+    // were filled beforehand, the parser's async population silently
+    // overwrites them. Uploading first and waiting it out means the
+    // profile's real values always go in last.
+    await uploadResume(page, profile.resumePath, result);
+    await waitForResumeParseToSettle(page);
+
+    // The parse can take a few seconds, which is also enough time for a
+    // CAPTCHA to appear that wasn't there at the start — check again rather
+    // than filling past it.
+    if (await isCaptchaPresent(page)) {
+      result.notes.push(
+        'A CAPTCHA / verification challenge appeared after the résumé upload — the rest of the ' +
+          'form was not filled. Solve it yourself, then fill out the rest by hand.',
       );
       return result;
     }
@@ -88,18 +110,6 @@ export const lever: AtsHandler = {
       'Current Location',
       result,
     );
-
-    await uploadResume(page, profile.resumePath, result);
-
-    // The upload is enough time for a CAPTCHA to appear that wasn't there at
-    // the start — check again rather than filling past it.
-    if (await isCaptchaPresent(page)) {
-      result.notes.push(
-        'A CAPTCHA / verification challenge appeared after the résumé upload — the rest of the ' +
-          'form was not filled. Solve it yourself, then fill out the rest by hand.',
-      );
-      return result;
-    }
 
     await fillField(
       page,

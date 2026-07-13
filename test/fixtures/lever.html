@@ -69,6 +69,18 @@
 
     <label for="resume-upload">Resume/CV *</label>
     <input type="file" id="resume-upload" name="resume">
+    <script>
+      // Mimics Lever's real resume-parse-and-autofill behavior (confirmed
+      // live, same as Greenhouse): a moment after the résumé is attached,
+      // the parsed PDF text overwrites matching fields. If a handler filled
+      // these fields BEFORE uploading the résumé, this would clobber them.
+      document.getElementById('resume-upload').addEventListener('change', function () {
+        setTimeout(function () {
+          document.getElementById('name').value = 'Parsed Wrong Name';
+          document.getElementById('email').value = 'wrong-parsed-address@example.com';
+        }, 300);
+      });
+    </script>
 
     <h3>Links</h3>
     <label for="url-linkedin">LinkedIn URL</label>
