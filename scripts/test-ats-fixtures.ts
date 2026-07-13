@@ -231,6 +231,29 @@ async function testLever(page: Page): Promise<void> {
   );
 }
 
+async function testCaptchaGuard(page: Page): Promise<void> {
+  console.log('\nCAPTCHA guard: stops entirely rather than filling past it:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'greenhouse.html')).href);
+  // Simulate a CAPTCHA widget having appeared on the page (e.g. a Cloudflare
+  // Turnstile / reCAPTCHA challenge) before any filling happens.
+  await page.evaluate(() => {
+    const div = document.createElement('div');
+    div.className = 'g-recaptcha';
+    div.setAttribute('data-sitekey', 'test');
+    div.style.cssText = 'width: 300px; height: 76px;';
+    document.body.prepend(div);
+  });
+
+  const result = await greenhouse.fill(page, profile);
+  check('Nothing filled while a CAPTCHA is showing', result.filled.length === 0);
+  check('Nothing reported skipped either (fill never even attempted)', result.skipped.length === 0);
+  check(
+    'A clear note explains the CAPTCHA blocked filling',
+    result.notes.some((n) => /captcha/i.test(n)),
+  );
+  check('First Name left untouched', (await value(page, '#first_name')) === '');
+}
+
 async function main(): Promise<void> {
   if (!existsSync(RESUME)) {
     console.error(`Resume file not found at ${RESUME} — this test uploads a real PDF.`);
@@ -244,6 +267,7 @@ async function main(): Promise<void> {
     const page = await browser.newPage();
     await testGreenhouse(page);
     await testLever(page);
+    await testCaptchaGuard(page);
   } finally {
     await browser.close();
   }

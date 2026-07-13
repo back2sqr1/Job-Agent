@@ -1,5 +1,12 @@
 import type { Page } from 'playwright';
-import { countBlankTextareas, customQuestionNote, fillCombobox, fillField, uploadResume } from './helpers';
+import {
+  countBlankTextareas,
+  customQuestionNote,
+  fillCombobox,
+  fillField,
+  isCaptchaPresent,
+  uploadResume,
+} from './helpers';
 import type { Profile } from './profile';
 import { AtsHandler, FillResult, emptyResult } from './types';
 
@@ -28,6 +35,16 @@ export const greenhouse: AtsHandler = {
 
   async fill(page: Page, profile: Profile): Promise<FillResult> {
     const result = emptyResult();
+
+    // Never click or type past a CAPTCHA/verification challenge — stop
+    // entirely and leave the whole page untouched for the human.
+    if (await isCaptchaPresent(page)) {
+      result.notes.push(
+        'A CAPTCHA / verification challenge is showing on this page — nothing was filled. ' +
+          'Solve it yourself, then fill out the form by hand.',
+      );
+      return result;
+    }
 
     await fillField(
       page,

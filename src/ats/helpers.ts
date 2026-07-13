@@ -15,6 +15,51 @@ export const EEO_PATTERN =
 const FILLABLE_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'search', '']);
 
 /**
+ * Selectors for the common CAPTCHA/bot-challenge widgets (reCAPTCHA,
+ * hCaptcha, Cloudflare Turnstile). Used only to detect and back off, never
+ * to solve or work around one — see isCaptchaPresent below.
+ */
+const CAPTCHA_SELECTORS = [
+  'iframe[src*="recaptcha"]',
+  'iframe[src*="hcaptcha"]',
+  'iframe[src*="challenges.cloudflare.com"]',
+  '.g-recaptcha',
+  '.h-captcha',
+  '.cf-turnstile',
+  '[data-sitekey]',
+].join(', ');
+
+/**
+ * Checks whether a CAPTCHA/"verify you're human" challenge is visibly
+ * present on the page. This project never attempts to solve or evade one —
+ * that's a hard line — but it also should not keep blindly clicking/typing
+ * once one has popped up, since a forced click (used for hidden file inputs
+ * and comboboxes elsewhere in this file) can land on or through whatever
+ * overlay is now covering the form. Handlers check this once before filling
+ * anything and simply stop if it's already up, leaving the entire page
+ * untouched for the human to solve and finish by hand.
+ */
+export async function isCaptchaPresent(page: Page): Promise<boolean> {
+  try {
+    const widgets = page.locator(CAPTCHA_SELECTORS);
+    const count = await widgets.count();
+    for (let i = 0; i < count; i++) {
+      if (await widgets.nth(i).isVisible().catch(() => false)) return true;
+    }
+  } catch {
+    // fall through to the text-based check below
+  }
+  try {
+    const textHit = page.getByText(
+      /verify you.{0,3}re human|i.{0,3}m not a robot|security check|complete the challenge/i,
+    );
+    return (await textHit.count()) > 0 && (await textHit.first().isVisible().catch(() => false));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * One profile-backed form field a handler wants to fill.
  * `labels` are accessible-name patterns (tried in order via page.getByLabel);
  * `fallbackSelectors` are optional last-resort CSS selectors for markup that
