@@ -353,30 +353,51 @@ export async function fillAutocomplete(
   fieldName: string,
   result: FillResult,
 ): Promise<boolean> {
+  const fail = (reason: string): false => {
+    result.skipped.push(fieldName);
+    result.notes.push(`${fieldName}: ${reason}`);
+    return false;
+  };
+
   try {
     await input.click({ timeout: 3_000 });
-    await input.fill(typedValue, { timeout: 3_000 });
-    const results = page.locator(resultsSelector);
-    await results.first().waitFor({ state: 'visible', timeout: 5_000 });
+  } catch {
+    return fail("couldn't click into the field at all — it may be covered by something else.");
+  }
 
-    let target = results.first();
-    if (preferredText) {
-      const count = await results.count();
-      for (let i = 0; i < count; i++) {
-        const text = (await results.nth(i).textContent()) ?? '';
-        if (text.toLowerCase().includes(preferredText.toLowerCase())) {
-          target = results.nth(i);
-          break;
-        }
+  try {
+    await input.fill(typedValue, { timeout: 3_000 });
+  } catch {
+    return fail(`found the field but typing "${typedValue}" into it failed.`);
+  }
+
+  const results = page.locator(resultsSelector);
+  try {
+    await results.first().waitFor({ state: 'visible', timeout: 5_000 });
+  } catch {
+    return fail(`typed "${typedValue}" but no suggestions appeared within 5 seconds.`);
+  }
+
+  let target = results.first();
+  if (preferredText) {
+    const count = await results.count();
+    for (let i = 0; i < count; i++) {
+      const text = (await results.nth(i).textContent()) ?? '';
+      if (text.toLowerCase().includes(preferredText.toLowerCase())) {
+        target = results.nth(i);
+        break;
       }
     }
-    await target.click({ timeout: 3_000 });
-    result.filled.push(fieldName);
-    return true;
-  } catch {
-    result.skipped.push(fieldName);
-    return false;
   }
+
+  try {
+    await target.click({ timeout: 3_000 });
+  } catch {
+    return fail('suggestions appeared, but clicking one to select it failed.');
+  }
+
+  result.filled.push(fieldName);
+  return true;
 }
 
 /**
