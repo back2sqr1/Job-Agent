@@ -111,6 +111,17 @@ export const lever: AtsHandler = {
       result,
     );
 
+    // Confirmed live: typing into the location field can itself trigger a
+    // CAPTCHA (its autocomplete does a live lookup, which some boards gate
+    // behind a challenge) — check again here too rather than filling past it.
+    if (await isCaptchaPresent(page)) {
+      result.notes.push(
+        'A CAPTCHA / verification challenge appeared while filling in your location — the rest of ' +
+          'the form was not filled. Solve it yourself, then fill out the rest by hand.',
+      );
+      return result;
+    }
+
     await fillField(
       page,
       {

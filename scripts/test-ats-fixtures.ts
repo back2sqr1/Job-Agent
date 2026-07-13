@@ -291,6 +291,43 @@ async function testCaptchaAfterResumeUpload(page: Page): Promise<void> {
   );
 }
 
+async function testCaptchaDuringLocationFill(page: Page): Promise<void> {
+  console.log('\nCAPTCHA guard: also catches a challenge triggered by the location autocomplete:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'lever.html')).href);
+  // Simulate the location field's live lookup itself triggering a CAPTCHA
+  // (confirmed live on Lever) — attached after the fixture's own listener,
+  // so it runs second and wipes out the real suggestions in favor of a
+  // captcha, mirroring "typing shows a challenge instead of results."
+  await page.evaluate(() => {
+    document.getElementById('location')!.addEventListener('input', () => {
+      document.querySelector('.dropdown-results')!.innerHTML = '';
+      if (!document.querySelector('.h-captcha')) {
+        const div = document.createElement('div');
+        div.className = 'h-captcha';
+        div.setAttribute('data-sitekey', 'test');
+        div.style.cssText = 'width: 300px; height: 78px;';
+        document.body.prepend(div);
+      }
+    });
+  });
+
+  const result = await lever.fill(page, profile);
+  check('Résumé was still uploaded (captcha appeared only later)', result.resumeUploaded);
+  check(
+    'Full Name/Email/Phone were still filled (captcha appeared only at location)',
+    ['Full Name', 'Email', 'Phone'].every((f) => result.filled.includes(f)),
+  );
+  check('Current Location itself was not filled', !result.filled.includes('Current Location'));
+  check(
+    'Nothing after Current Location was filled either',
+    !['LinkedIn', 'GitHub', 'Twitter/X'].some((f) => result.filled.includes(f)),
+  );
+  check(
+    'Note explains the CAPTCHA appeared while filling in location',
+    result.notes.some((n) => /captcha/i.test(n) && /location/i.test(n)),
+  );
+}
+
 async function main(): Promise<void> {
   if (!existsSync(RESUME)) {
     console.error(`Resume file not found at ${RESUME} — this test uploads a real PDF.`);
@@ -306,6 +343,7 @@ async function main(): Promise<void> {
     await testLever(page);
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);
+    await testCaptchaDuringLocationFill(page);
   } finally {
     await browser.close();
   }
