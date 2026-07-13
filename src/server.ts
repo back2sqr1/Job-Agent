@@ -1,7 +1,17 @@
 import express from 'express';
 import { DB_PATH, runScan, ScanSummary } from './core/scan';
 import { Store } from './db/store';
-import { renderDashboard, renderHistory } from './web/render';
+import { PositionFilter, renderDashboard, renderHistory } from './web/render';
+
+/** Reads ?type= off a request, defaulting to 'all' for anything unrecognized. */
+function parseTypeFilter(raw: unknown): PositionFilter {
+  return raw === 'new-grad' || raw === 'internship' ? raw : 'all';
+}
+
+/** Where a POST action should redirect back to, preserving the active tab. */
+function dashboardRedirect(activeType: PositionFilter): string {
+  return activeType === 'all' ? '/' : `/?type=${activeType}`;
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOURLY_MS = 60 * 60 * 1000;
@@ -43,7 +53,8 @@ async function scanOnce(label: string): Promise<ScanSummary> {
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/', (_req, res) => {
+app.get('/', (req, res) => {
+  const activeType = parseTypeFilter(req.query.type);
   const store = new Store(DB_PATH);
   let candidates;
   try {
@@ -51,6 +62,17 @@ app.get('/', (_req, res) => {
   } finally {
     store.close();
   }
+  const counts = {
+    all: candidates.length,
+    newGrad: candidates.filter((l) => l.positionType === 'New Grad').length,
+    internship: candidates.filter((l) => l.positionType === 'Internship').length,
+  };
+  const filtered =
+    activeType === 'all'
+      ? candidates
+      : candidates.filter(
+          (l) => l.positionType === (activeType === 'new-grad' ? 'New Grad' : 'Internship'),
+        );
   const flash = lastScanAt
     ? `Last scan: ${new Date(lastScanAt * 1000).toLocaleString()} — ` +
       `${lastScanSummary?.totalNew ?? 0} new, ${lastScanSummary?.totalCandidates ?? 0} candidates` +
@@ -61,7 +83,7 @@ app.get('/', (_req, res) => {
         ? ` (${lastScanSummary.failures} source(s) failed)`
         : '')
     : undefined;
-  res.send(renderDashboard(candidates, flash));
+  res.send(renderDashboard(filtered, flash, activeType, counts));
 });
 
 app.get('/history', (_req, res) => {
@@ -77,6 +99,7 @@ app.get('/history', (_req, res) => {
 });
 
 app.post('/listings/:id/apply', (req, res) => {
+  const activeType = parseTypeFilter(req.query.type);
   const store = new Store(DB_PATH);
   let ok;
   try {
@@ -88,10 +111,11 @@ app.post('/listings/:id/apply', (req, res) => {
     res.status(404).send('Listing not found');
     return;
   }
-  res.redirect('/');
+  res.redirect(dashboardRedirect(activeType));
 });
 
 app.post('/listings/:id/decline', (req, res) => {
+  const activeType = parseTypeFilter(req.query.type);
   const store = new Store(DB_PATH);
   let ok;
   try {
@@ -103,13 +127,14 @@ app.post('/listings/:id/decline', (req, res) => {
     res.status(404).send('Listing not found');
     return;
   }
-  res.redirect('/');
+  res.redirect(dashboardRedirect(activeType));
 });
 
-app.post('/refresh', (_req, res) => {
+app.post('/refresh', (req, res) => {
+  const activeType = parseTypeFilter(req.query.type);
   scanOnce('manual /refresh')
-    .then(() => res.redirect('/'))
-    .catch(() => res.redirect('/'));
+    .then(() => res.redirect(dashboardRedirect(activeType)))
+    .catch(() => res.redirect(dashboardRedirect(activeType)));
 });
 
 app.listen(PORT, () => {

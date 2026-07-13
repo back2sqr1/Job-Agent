@@ -62,6 +62,9 @@ function layout(title: string, activeNav: 'dashboard' | 'history', body: string)
   .type-tag.internship { color: #9a6a1f; border-color: #9a6a1f; }
   button.copy-btn { font-size: 0.8rem; white-space: nowrap; }
   button.copy-btn.copied { border-color: #2a8f4b; color: #2a8f4b; }
+  .type-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid #8884; }
+  .type-tabs a { padding: 0.5rem 0.9rem; text-decoration: none; border-bottom: 2px solid transparent; opacity: 0.7; }
+  .type-tabs a.active { border-bottom-color: currentColor; opacity: 1; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -116,6 +119,25 @@ function listingRow(l: StoredListing, actions: string): string {
 </tr>`;
 }
 
+/** Which tab of the dashboard is active. 'all' shows both position types. */
+export type PositionFilter = 'all' | 'new-grad' | 'internship';
+
+export interface PositionCounts {
+  all: number;
+  newGrad: number;
+  internship: number;
+}
+
+function typeTabsNav(activeType: PositionFilter, counts: PositionCounts): string {
+  const tab = (type: PositionFilter, label: string, count: number): string =>
+    `<a href="/?type=${type}" class="${type === activeType ? 'active' : ''}">${escapeHtml(label)} (${count})</a>`;
+  return `<nav class="type-tabs">
+    ${tab('all', 'All', counts.all)}
+    ${tab('new-grad', 'New Grad', counts.newGrad)}
+    ${tab('internship', 'Internship', counts.internship)}
+  </nav>`;
+}
+
 function groupBySource(listings: StoredListing[]): Map<ListingSource, StoredListing[]> {
   const map = new Map<ListingSource, StoredListing[]>();
   for (const src of SOURCE_ORDER) map.set(src, []);
@@ -126,17 +148,24 @@ function groupBySource(listings: StoredListing[]): Map<ListingSource, StoredList
   return map;
 }
 
-export function renderDashboard(candidates: StoredListing[], flash?: string): string {
+export function renderDashboard(
+  candidates: StoredListing[],
+  flash: string | undefined,
+  activeType: PositionFilter,
+  counts: PositionCounts,
+): string {
   const grouped = groupBySource(candidates);
+  const tabQuery = activeType === 'all' ? '' : `?type=${activeType}`;
   let body = '';
-  body += `<form method="post" action="/refresh" style="margin-bottom: 1rem;">
+  body += typeTabsNav(activeType, counts);
+  body += `<form method="post" action="/refresh${tabQuery}" style="margin-bottom: 1rem;">
     <button type="submit" class="refresh-btn">Refresh now</button>
     <span class="muted"> — also auto-refreshes hourly in the background while the server runs.</span>
   </form>`;
   if (flash) body += `<div class="flash">${escapeHtml(flash)}</div>`;
 
   if (candidates.length === 0) {
-    body += `<p class="empty">No candidate listings right now. Run a scan, or widen config/filters.yaml.</p>`;
+    body += `<p class="empty">No candidate listings right now. Run a scan, widen config/filters.yaml, or check another tab.</p>`;
   }
 
   for (const [source, items] of grouped) {
@@ -150,10 +179,10 @@ export function renderDashboard(candidates: StoredListing[], flash?: string): st
         .map((l) =>
           listingRow(
             l,
-            `<form method="post" action="/listings/${encodeURIComponent(l.id)}/apply">
+            `<form method="post" action="/listings/${encodeURIComponent(l.id)}/apply${tabQuery}">
               <button type="submit" class="apply">Apply</button>
             </form>
-            <form method="post" action="/listings/${encodeURIComponent(l.id)}/decline">
+            <form method="post" action="/listings/${encodeURIComponent(l.id)}/decline${tabQuery}">
               <button type="submit" class="decline">Decline</button>
             </form>`,
           ),
