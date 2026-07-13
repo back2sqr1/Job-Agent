@@ -110,6 +110,18 @@ export const lever: AtsHandler = {
       },
       result,
     );
+    if (profile.twitter) {
+      await fillField(
+        page,
+        {
+          field: 'Twitter/X',
+          labels: [/twitter/i, /x\s*\(\s*twitter\s*\)/i, /^\s*x\s*$/i],
+          fallbackSelectors: ['input[name="urls[Twitter]"]'],
+          value: profile.twitter,
+        },
+        result,
+      );
+    }
 
     // "Current company", "Additional information", and any custom questions
     // are deliberately not filled: they don't map unambiguously to a Profile

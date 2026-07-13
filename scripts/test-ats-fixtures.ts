@@ -46,6 +46,7 @@ const profile: Profile = {
   portfolio: 'https://testy.example.com',
   resumePath: RESUME,
   country: 'United States',
+  twitter: 'https://x.com/testy',
 };
 
 const failures: string[] = [];
@@ -119,6 +120,7 @@ async function testGreenhouse(page: Page): Promise<void> {
     (await value(page, '#question_linkedin')) === 'https://www.linkedin.com/in/testy',
   );
   check('Website filled with portfolio', (await value(page, '#question_website')) === 'https://testy.example.com');
+  check('Twitter/X filled', (await value(page, '#question_twitter')) === 'https://x.com/testy');
   check('School filled (plain text input)', (await value(page, '#school')) === 'Test University');
   check('Graduation date filled', (await value(page, '#grad_date')) === 'May 2099');
 
@@ -150,9 +152,17 @@ async function testGreenhouse(page: Page): Promise<void> {
   );
   check(
     'filled list looks right',
-    ['First Name', 'Last Name', 'Email', 'Phone', 'Country', 'Resume', 'LinkedIn', 'School'].every(
-      (f) => result.filled.includes(f),
-    ),
+    [
+      'First Name',
+      'Last Name',
+      'Email',
+      'Phone',
+      'Country',
+      'Resume',
+      'LinkedIn',
+      'School',
+      'Twitter/X',
+    ].every((f) => result.filled.includes(f)),
   );
 
   // Hard-guard test: even a hostile field spec that MATCHES an EEO label by
@@ -197,6 +207,7 @@ async function testLever(page: Page): Promise<void> {
     (await value(page, '#url-linkedin')) === 'https://www.linkedin.com/in/testy',
   );
   check('GitHub URL filled', (await value(page, '#url-github')) === 'https://github.com/testy');
+  check('Twitter/X URL filled', (await value(page, '#url-twitter')) === 'https://x.com/testy');
   check('Portfolio (absent on page) reported in skipped', result.skipped.includes('Portfolio'));
 
   check('Additional information textarea left blank', (await value(page, '#comments')) === '');
@@ -207,9 +218,16 @@ async function testLever(page: Page): Promise<void> {
 
   check(
     'filled list looks right',
-    ['Full Name', 'Email', 'Phone', 'Current Location', 'Resume', 'LinkedIn', 'GitHub'].every(
-      (f) => result.filled.includes(f),
-    ),
+    [
+      'Full Name',
+      'Email',
+      'Phone',
+      'Current Location',
+      'Resume',
+      'LinkedIn',
+      'GitHub',
+      'Twitter/X',
+    ].every((f) => result.filled.includes(f)),
   );
 }
 

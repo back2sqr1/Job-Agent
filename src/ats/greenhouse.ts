@@ -78,6 +78,13 @@ export const greenhouse: AtsHandler = {
       { field: 'Website/Portfolio', labels: [/portfolio/i, /website/i], value: profile.portfolio },
       result,
     );
+    if (profile.twitter) {
+      await fillField(
+        page,
+        { field: 'Twitter/X', labels: [/twitter/i, /x\s*\(\s*twitter\s*\)/i, /^\s*x\s*$/i], value: profile.twitter },
+        result,
+      );
+    }
     await fillField(
       page,
       {

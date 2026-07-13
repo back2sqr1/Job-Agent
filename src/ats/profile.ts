@@ -26,6 +26,8 @@ export interface Profile {
   linkedin: string;
   github: string;
   portfolio: string;
+  /** e.g. "https://x.com/yourhandle". Optional — omit the key to skip this field entirely. */
+  twitter?: string;
   /**
    * Path to the resume PDF. In config/profile.json this may be relative to
    * the repo root (e.g. "resumes/your-resume.pdf"); loadProfile() resolves it
@@ -89,7 +91,7 @@ export function loadProfile(filePath: string = PROFILE_PATH): Profile {
   }
 
   const obj = doc as Record<string, unknown>;
-  const known: string[] = [...STRING_FIELDS, 'graduationYear', 'country'];
+  const known: string[] = [...STRING_FIELDS, 'graduationYear', 'country', 'twitter'];
   for (const key of Object.keys(obj)) {
     if (!known.includes(key)) {
       throw new ProfileError(
@@ -100,6 +102,9 @@ export function loadProfile(filePath: string = PROFILE_PATH): Profile {
 
   if ('country' in obj && (typeof obj['country'] !== 'string' || (obj['country'] as string).trim() === '')) {
     throw new ProfileError(`${filePath}: "country" must be a non-empty string if present`);
+  }
+  if ('twitter' in obj && (typeof obj['twitter'] !== 'string' || (obj['twitter'] as string).trim() === '')) {
+    throw new ProfileError(`${filePath}: "twitter" must be a non-empty string if present (or omit the key entirely)`);
   }
 
   for (const key of STRING_FIELDS) {
@@ -146,5 +151,6 @@ export function loadProfile(filePath: string = PROFILE_PATH): Profile {
     portfolio: obj['portfolio'] as string,
     resumePath,
     country: (obj['country'] as string | undefined) ?? 'United States',
+    twitter: obj['twitter'] as string | undefined,
   };
 }
