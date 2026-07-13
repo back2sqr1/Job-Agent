@@ -254,6 +254,43 @@ async function testCaptchaGuard(page: Page): Promise<void> {
   check('First Name left untouched', (await value(page, '#first_name')) === '');
 }
 
+async function testCaptchaAfterResumeUpload(page: Page): Promise<void> {
+  console.log('\nCAPTCHA guard: also catches a challenge that appears after the résumé upload:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'greenhouse.html')).href);
+  // Simulate a CAPTCHA that only appears once the résumé finishes uploading
+  // (not present at page load) — this is what "appears partway through"
+  // looks like, and is exactly why there's a second check after the upload.
+  await page.evaluate(() => {
+    document.getElementById('resume')!.addEventListener('change', () => {
+      setTimeout(() => {
+        const div = document.createElement('div');
+        div.className = 'h-captcha';
+        div.setAttribute('data-sitekey', 'test');
+        div.style.cssText = 'width: 300px; height: 78px;';
+        document.body.prepend(div);
+      }, 50);
+    });
+  });
+
+  const result = await greenhouse.fill(page, profile);
+  check('Résumé was still uploaded (captcha appeared only after)', result.resumeUploaded);
+  check(
+    'Nothing else filled once the post-upload CAPTCHA appeared',
+    result.filled.length === 1 && result.filled[0] === 'Resume',
+  );
+  check(
+    'Note explains the CAPTCHA appeared after the résumé upload',
+    result.notes.some((n) => /captcha/i.test(n) && /résumé|resume/i.test(n)),
+  );
+  // Note: First Name isn't necessarily empty here — the fixture's own
+  // simulated resume-parse script overwrites it independently of our code.
+  // What matters is that OUR handler never wrote its value into it.
+  check(
+    'Our code never filled First Name (stopped before reaching it)',
+    (await value(page, '#first_name')) !== profile.firstName,
+  );
+}
+
 async function main(): Promise<void> {
   if (!existsSync(RESUME)) {
     console.error(`Resume file not found at ${RESUME} — this test uploads a real PDF.`);
@@ -268,6 +305,7 @@ async function main(): Promise<void> {
     await testGreenhouse(page);
     await testLever(page);
     await testCaptchaGuard(page);
+    await testCaptchaAfterResumeUpload(page);
   } finally {
     await browser.close();
   }

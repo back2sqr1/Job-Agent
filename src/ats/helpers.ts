@@ -249,6 +249,24 @@ export async function uploadResume(
 }
 
 /**
+ * After a résumé upload, some ATS's (confirmed live on Greenhouse) parse the
+ * PDF and auto-populate matching fields (name, email, phone, location, ...)
+ * a moment later — which, if those fields were already filled first, gets
+ * silently overwritten by whatever got parsed out of the PDF. Handlers that
+ * see this should upload the résumé and wait for it to settle *before*
+ * filling anything else, so the profile's real values are the last word.
+ *
+ * Best-effort: waits for network activity to quiet down (bounded — some
+ * SPAs poll and never go fully idle, so this must not hang forever), plus a
+ * short fixed grace period for any client-side DOM population that follows
+ * the network response.
+ */
+export async function waitForResumeParseToSettle(page: Page): Promise<void> {
+  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+  await page.waitForTimeout(1_000);
+}
+
+/**
  * Fill a react-select-style searchable combobox (confirmed live on
  * Greenhouse: a country-code picker next to the phone number field —
  * `role="combobox"`, `aria-autocomplete="list"`, a plain-looking text input

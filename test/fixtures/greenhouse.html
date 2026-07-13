@@ -73,6 +73,21 @@
     <label for="cover_letter">Cover Letter</label>
     <input type="file" id="cover_letter" name="job_application[cover_letter]">
 
+    <script>
+      // Mimics Greenhouse's real resume-parse-and-autofill behavior
+      // (confirmed live): a moment after the résumé is attached, the parsed
+      // PDF text overwrites matching fields. If a handler filled these
+      // fields BEFORE uploading the résumé, this would clobber them — the
+      // fix is to upload+settle first, fill after.
+      document.getElementById('resume').addEventListener('change', function () {
+        setTimeout(function () {
+          document.getElementById('first_name').value = 'Parsed-Wrong-First';
+          document.getElementById('last_name').value = 'Parsed-Wrong-Last';
+          document.getElementById('email').value = 'wrong-parsed-address@example.com';
+        }, 300);
+      });
+    </script>
+
     <label for="candidate-location">Location (City) *</label>
     <input type="text" id="candidate-location" name="job_application[location]">
 

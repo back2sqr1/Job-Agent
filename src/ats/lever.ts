@@ -91,6 +91,16 @@ export const lever: AtsHandler = {
 
     await uploadResume(page, profile.resumePath, result);
 
+    // The upload is enough time for a CAPTCHA to appear that wasn't there at
+    // the start — check again rather than filling past it.
+    if (await isCaptchaPresent(page)) {
+      result.notes.push(
+        'A CAPTCHA / verification challenge appeared after the résumé upload — the rest of the ' +
+          'form was not filled. Solve it yourself, then fill out the rest by hand.',
+      );
+      return result;
+    }
+
     await fillField(
       page,
       {

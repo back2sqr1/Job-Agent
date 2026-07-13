@@ -6,6 +6,7 @@ import {
   fillField,
   isCaptchaPresent,
   uploadResume,
+  waitForResumeParseToSettle,
 } from './helpers';
 import type { Profile } from './profile';
 import { AtsHandler, FillResult, emptyResult } from './types';
@@ -46,6 +47,26 @@ export const greenhouse: AtsHandler = {
       return result;
     }
 
+    // Upload the résumé FIRST and let any parse-and-autofill settle before
+    // touching anything else. Confirmed live: Greenhouse parses the PDF and
+    // auto-populates matching fields (name, email, phone, location, ...) a
+    // moment after upload — if those fields were filled beforehand, the
+    // parser's async population silently overwrites them. Uploading first
+    // and waiting it out means the profile's real values always go in last.
+    await uploadResume(page, profile.resumePath, result);
+    await waitForResumeParseToSettle(page);
+
+    // The parse can take a few seconds, which is also enough time for a
+    // CAPTCHA to appear that wasn't there at the start — check again rather
+    // than filling past it.
+    if (await isCaptchaPresent(page)) {
+      result.notes.push(
+        'A CAPTCHA / verification challenge appeared after the résumé upload — the rest of the ' +
+          'form was not filled. Solve it yourself, then fill out the rest by hand.',
+      );
+      return result;
+    }
+
     await fillField(
       page,
       {
@@ -81,8 +102,6 @@ export const greenhouse: AtsHandler = {
     // not a plain <select> — needs the type-and-pick-option flow, not a
     // plain fill.
     await fillCombobox(page, [/^\s*country/i], profile.country, 'Country', result);
-
-    await uploadResume(page, profile.resumePath, result);
 
     await fillField(
       page,
