@@ -9,6 +9,7 @@ import { fillField } from '../src/ats/helpers';
 import { lever } from '../src/ats/lever';
 import type { Profile } from '../src/ats/profile';
 import { emptyResult } from '../src/ats/types';
+import { workday } from '../src/ats/workday';
 
 /**
  * Fixture tests for the ATS handlers: launches Playwright against the local
@@ -91,8 +92,23 @@ function testDetection(): void {
     detectHandler('https://jobs.ashbyhq.com/acme/1234-abcd').name === 'Ashby',
   );
   check(
-    'myworkdayjobs.com -> fallback',
+    'myworkdayjobs.com -> Workday',
     detectHandler('https://acme.wd1.myworkdayjobs.com/en-US/careers/job/123').name ===
+      'Workday (first page only)',
+  );
+  check(
+    'myworkdaysite.com -> Workday',
+    detectHandler('https://acme.wd5.myworkdaysite.com/recruiting/acme/careers').name ===
+      'Workday (first page only)',
+  );
+  check(
+    'myworkdayjobs.com.evil.example is NOT Workday',
+    detectHandler('https://acme.wd1.myworkdayjobs.com.evil.example/x').name ===
+      'Manual (unsupported ATS)',
+  );
+  check(
+    'icims.com -> fallback',
+    detectHandler('https://careers-acme.icims.com/jobs/1234/job').name ===
       'Manual (unsupported ATS)',
   );
   check(
@@ -229,6 +245,82 @@ async function testAshby(page: Page): Promise<void> {
       'Degree',
       'Graduation Date',
     ].every((f) => result.filled.includes(f)),
+  );
+}
+
+async function testWorkday(page: Page): Promise<void> {
+  console.log('\nWorkday handler vs test/fixtures/workday.html:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday.html')).href);
+  const result = await workday.fill(page, profile);
+
+  // First/Last/Phone/City have no associated <label> in the fixture (as on
+  // real Workday) — these prove the data-automation-id fallbacks work.
+  check(
+    'First Name filled via data-automation-id fallback',
+    (await value(page, '[data-automation-id="legalNameSection_firstName"]')) === 'Testy',
+  );
+  check(
+    'Last Name filled via data-automation-id fallback',
+    (await value(page, '[data-automation-id="legalNameSection_lastName"]')) === 'McTestface',
+  );
+  check('Email filled (proper label)', (await value(page, '#email')) === 'testy@example.com');
+  check(
+    'Phone filled via data-automation-id fallback',
+    (await value(page, '[data-automation-id="phone-number"]')) === '555-000-1111',
+  );
+  check(
+    'City filled via data-automation-id fallback',
+    (await value(page, '[data-automation-id="addressSection_city"]')) === 'Testville',
+  );
+
+  const deviceType = await page
+    .locator('[data-automation-id="phone-device-type"]')
+    .textContent();
+  check('Phone device type dropdown (button) left alone', (deviceType ?? '').trim() === 'Select One');
+  const country = await page.locator('[data-automation-id="countryDropdown"]').textContent();
+  check('Country dropdown (button) left alone', (country ?? '').trim() === 'Select One');
+
+  check('No resume uploaded (no file input on this page)', !result.resumeUploaded);
+  check('Resume reported in skipped', result.skipped.includes('Resume'));
+  check(
+    'Note explains resume belongs on the My Experience step',
+    result.notes.some((n) => /my experience/i.test(n)),
+  );
+  check(
+    'Note says first-page-only, rest of wizard is manual',
+    result.notes.some((n) => /first page only/i.test(n)),
+  );
+  check(
+    'filled list looks right',
+    ['First Name', 'Last Name', 'Email', 'Phone', 'City'].every((f) => result.filled.includes(f)),
+  );
+}
+
+async function testWorkdaySignInWall(page: Page): Promise<void> {
+  console.log('\nWorkday handler: stops at the sign-in wall, never touches credentials:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday.html')).href);
+  // Simulate the tenant demanding sign-in/account creation before the form.
+  await page.evaluate(() => {
+    const email = document.createElement('input');
+    email.type = 'email';
+    email.setAttribute('data-automation-id', 'signIn-email');
+    const pw = document.createElement('input');
+    pw.type = 'password';
+    pw.setAttribute('data-automation-id', 'password');
+    document.body.prepend(pw);
+    document.body.prepend(email);
+  });
+
+  const result = await workday.fill(page, profile);
+  check('Nothing filled behind a sign-in wall', result.filled.length === 0);
+  check('Password field untouched', (await value(page, '[data-automation-id="password"]')) === '');
+  check(
+    'Note tells the user to sign in themselves and re-run',
+    result.notes.some((n) => /sign in/i.test(n) && /re-?run/i.test(n)),
+  );
+  check(
+    'Form fields behind the wall also untouched',
+    (await value(page, '[data-automation-id="legalNameSection_firstName"]')) === '',
   );
 }
 
@@ -397,6 +489,8 @@ async function main(): Promise<void> {
     await testGreenhouse(page);
     await testAshby(page);
     await testLever(page);
+    await testWorkday(page);
+    await testWorkdaySignInWall(page);
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);
     await testCaptchaDuringLocationFill(page);

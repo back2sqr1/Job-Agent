@@ -95,9 +95,12 @@ What it does:
 2. Opens the listing's application page in a **headed** browser
    (`playwright.config.ts` — the browser is always visible, never headless).
 3. Detects the ATS by hostname — **Greenhouse** (`job-boards.greenhouse.io`,
-   `boards.greenhouse.io`) and **Lever** (`jobs.lever.co`) have real handlers;
-   everything else (Workday, iCIMS, custom sites, ...) falls back to "page is
-   open, fill it in yourself".
+   `boards.greenhouse.io`), **Lever** (`jobs.lever.co`), **Ashby**
+   (`jobs.ashbyhq.com`), and **Workday** (`*.myworkdayjobs.com` — first form
+   page only; Workday is a multi-step wizard, usually behind a sign-in that
+   you complete yourself, and the remaining steps stay manual) have real
+   handlers; everything else (iCIMS, SmartRecruiters, custom sites, ...)
+   falls back to "page is open, fill it in yourself".
 4. Fills the fields that map directly to your profile (name, email, phone,
    location, links, resume upload) and prints a summary of what was filled
    vs skipped. Free-text questions ("Why do you want to work here?") are
@@ -168,12 +171,15 @@ CI system, and no data is ever auto-committed anywhere.
 
 - **Phase 1 (done)** — scan, dedupe, filter, store, and a local review website
   (apply/decline/history).
-- **Phase 2 (this)** — Playwright-assisted form filling for Greenhouse and
-  Lever (`npm run apply -- <id>`), with a manual-mode fallback for everything
-  else. The dashboard's Apply button is unchanged — it still just marks status;
-  the browser flow is a separate CLI command.
-- **Phase 3** — a Workday handler (multi-step wizard, deliberately deferred),
-  application-history export, and further polish.
+- **Phase 2 (this)** — Playwright-assisted form filling for Greenhouse,
+  Lever, Ashby, and Workday's first form page (`npm run apply -- <id>`), with
+  a manual-mode fallback for everything else. The dashboard's Apply button is
+  unchanged — it still just marks status; the browser flow is a separate CLI
+  command. Greenhouse and Lever have been corrected against live postings;
+  Ashby and Workday are fixture-tested best guesses awaiting their first real
+  runs.
+- **Phase 3** — Workday's full multi-step wizard, more ATSs (iCIMS,
+  SmartRecruiters), application-history export, and further polish.
 
 ## Ethical use & limitations
 

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Software Engineer Intern — Acme Corp (Workday fixture)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; }
+    label, .fake-label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, button.dropdown { display: block; width: 100%; padding: 6px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <!--
+    Local test fixture for Workday's first form page ("My Information").
+    UNVERIFIED against a live tenant — best-guess conventions. Deliberately
+    quirky in Workday's way: several fields have NO associated <label>
+    (Workday's DOM often breaks label association), relying instead on
+    data-automation-id attributes, which is exactly what the handler's
+    fallback selectors target. There is NO file input on this page — Workday
+    asks for the resume on the "My Experience" step — so the handler must
+    report that as an expected note, not a failure.
+  -->
+  <h1>Apply — My Information (Step 1 of 5)</h1>
+
+  <form>
+    <span class="fake-label">First Name *</span>
+    <input type="text" data-automation-id="legalNameSection_firstName" name="firstName">
+
+    <span class="fake-label">Last Name *</span>
+    <input type="text" data-automation-id="legalNameSection_lastName" name="lastName">
+
+    <label for="email">Email Address *</label>
+    <input type="email" id="email" data-automation-id="email" name="email">
+
+    <span class="fake-label">Phone Number *</span>
+    <input type="tel" data-automation-id="phone-number" name="phone">
+
+    <span class="fake-label">City</span>
+    <input type="text" data-automation-id="addressSection_city" name="city">
+
+    <!-- Workday custom dropdown: a button, not a select/input. Must be left alone. -->
+    <span class="fake-label">Phone Device Type *</span>
+    <button type="button" class="dropdown" data-automation-id="phone-device-type"
+            aria-haspopup="listbox">Select One</button>
+
+    <span class="fake-label">Country *</span>
+    <button type="button" class="dropdown" data-automation-id="countryDropdown"
+            aria-haspopup="listbox">Select One</button>
+
+    <button type="submit" data-automation-id="bottom-navigation-next-button">Next</button>
+  </form>
+</body>
+</html>
