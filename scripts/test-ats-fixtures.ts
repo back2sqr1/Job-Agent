@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, Page } from 'playwright';
+import { ashby } from '../src/ats/ashby';
 import { detectHandler } from '../src/ats/detect';
 import { greenhouse } from '../src/ats/greenhouse';
 import { fillField } from '../src/ats/helpers';
@@ -84,6 +85,10 @@ function testDetection(): void {
   check(
     'jobs.lever.co -> Lever',
     detectHandler('https://jobs.lever.co/acme/1234-abcd/apply').name === 'Lever',
+  );
+  check(
+    'jobs.ashbyhq.com -> Ashby',
+    detectHandler('https://jobs.ashbyhq.com/acme/1234-abcd').name === 'Ashby',
   );
   check(
     'myworkdayjobs.com -> fallback',
@@ -175,6 +180,56 @@ async function testGreenhouse(page: Page): Promise<void> {
   );
   check('EEO guard blocks a direct label match on a text input', (await value(page, '#gender_identity')) === '');
   check('EEO guard probe reported as skipped', probe.skipped.includes('EEO guard probe'));
+}
+
+async function testAshby(page: Page): Promise<void> {
+  console.log('\nAshby handler vs test/fixtures/ashby.html:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'ashby.html')).href);
+  const result = await ashby.fill(page, profile);
+
+  // Résumé uploaded first, and its (simulated) parse-and-overwrite settles
+  // before the real values get filled — same ordering fix as Greenhouse/Lever.
+  check('Name filled (survives simulated resume-parse overwrite)', (await value(page, '#name')) === 'Testy McTestface');
+  check('Email filled (survives simulated resume-parse overwrite)', (await value(page, '#email')) === 'testy@example.com');
+  check('Phone filled', (await value(page, '#phone')) === '555-000-1111');
+  check('Location filled', (await value(page, '#location')) === 'Testville, TS');
+  check('LinkedIn filled', (await value(page, '#linkedin')) === 'https://www.linkedin.com/in/testy');
+  check('GitHub filled', (await value(page, '#github')) === 'https://github.com/testy');
+  check('Portfolio filled', (await value(page, '#portfolio')) === 'https://testy.example.com');
+  check('Twitter/X filled', (await value(page, '#twitter')) === 'https://x.com/testy');
+  check('School filled', (await value(page, '#school')) === 'Test University');
+  check('Degree filled', (await value(page, '#degree')) === 'B.S. Testing');
+  check('Graduation date filled', (await value(page, '#grad_date')) === 'May 2099');
+
+  const resume = await attachedFile(page, '#resume');
+  check(
+    `Resume attached via setInputFiles (${RESUME_NAME})`,
+    resume !== null && resume.name === RESUME_NAME && resume.size > 0,
+  );
+  check('result.resumeUploaded is true', result.resumeUploaded);
+
+  check('Custom question textarea left blank', (await value(page, '#question_why')) === '');
+  check('EEO gender identity text input NOT filled', (await value(page, '#gender_identity')) === '');
+  check('EEO veteran select NOT filled', (await value(page, '#veteran')) === '');
+  check('EEO disability select NOT filled', (await value(page, '#disability')) === '');
+
+  check(
+    'filled list looks right',
+    [
+      'Name',
+      'Email',
+      'Phone',
+      'Location',
+      'Resume',
+      'LinkedIn',
+      'GitHub',
+      'Portfolio/Website',
+      'Twitter/X',
+      'School',
+      'Degree',
+      'Graduation Date',
+    ].every((f) => result.filled.includes(f)),
+  );
 }
 
 async function testLever(page: Page): Promise<void> {
@@ -340,6 +395,7 @@ async function main(): Promise<void> {
   try {
     const page = await browser.newPage();
     await testGreenhouse(page);
+    await testAshby(page);
     await testLever(page);
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);

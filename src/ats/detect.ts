@@ -1,3 +1,4 @@
+import { ashby } from './ashby';
 import { fallback } from './fallback';
 import { greenhouse } from './greenhouse';
 import { lever } from './lever';
@@ -7,7 +8,7 @@ import { AtsHandler } from './types';
  * All handlers, in match order. `fallback.detect()` accepts everything, so it
  * must stay last — it is the answer for any URL no real handler recognizes.
  */
-export const HANDLERS: AtsHandler[] = [greenhouse, lever, fallback];
+export const HANDLERS: AtsHandler[] = [greenhouse, lever, ashby, fallback];
 
 /** Route a URL (by hostname) to the handler that claims it; fallback otherwise. */
 export function detectHandler(url: string): AtsHandler {

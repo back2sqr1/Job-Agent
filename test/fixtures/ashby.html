@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Software Engineer Intern — Acme Corp (Ashby fixture)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, select, textarea { display: block; width: 100%; padding: 6px; margin-top: 4px; }
+    fieldset { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <!--
+    Local test fixture for Ashby (jobs.ashbyhq.com) — UNVERIFIED against a
+    real posting, built from best-guess conventions the same way
+    Greenhouse/Lever originally were. Tests the fill logic against this best
+    guess, not confirmed production markup.
+  -->
+  <h1>Software Engineer Intern</h1>
+  <h2>Application</h2>
+
+  <form>
+    <label for="name">Name *</label>
+    <input type="text" id="name" name="name">
+
+    <label for="email">Email *</label>
+    <input type="email" id="email" name="email">
+
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone">
+
+    <label for="location">Location</label>
+    <input type="text" id="location" name="location">
+
+    <label for="resume">Resume/CV *</label>
+    <input type="file" id="resume" name="resume">
+    <script>
+      // Mimics the resume-parse-and-autofill behavior confirmed live on both
+      // Greenhouse and Lever — built in here defensively even without
+      // confirmed evidence Ashby does the same, since the handler's
+      // upload-first ordering should protect against it either way.
+      document.getElementById('resume').addEventListener('change', function () {
+        setTimeout(function () {
+          document.getElementById('name').value = 'Parsed Wrong Name';
+          document.getElementById('email').value = 'wrong-parsed-address@example.com';
+        }, 300);
+      });
+    </script>
+
+    <label for="linkedin">LinkedIn URL</label>
+    <input type="text" id="linkedin" name="linkedin">
+
+    <label for="github">GitHub URL</label>
+    <input type="text" id="github" name="github">
+
+    <label for="portfolio">Portfolio/Website</label>
+    <input type="text" id="portfolio" name="portfolio">
+
+    <label for="twitter">Twitter/X</label>
+    <input type="text" id="twitter" name="twitter">
+
+    <label for="school">School</label>
+    <input type="text" id="school" name="school">
+
+    <label for="degree">Degree</label>
+    <input type="text" id="degree" name="degree">
+
+    <label for="grad_date">Graduation Date</label>
+    <input type="text" id="grad_date" name="grad_date">
+
+    <!-- Custom question: must be left blank, never answered on the user's behalf -->
+    <label for="question_why">Why do you want to work at Acme Corp?</label>
+    <textarea id="question_why" name="question_why" rows="4"></textarea>
+
+    <!-- EEO / voluntary self-identification: must NEVER be auto-filled -->
+    <fieldset>
+      <legend>Voluntary Self-Identification</legend>
+
+      <label for="gender_identity">Gender identity (voluntary self-identification)</label>
+      <input type="text" id="gender_identity" name="eeo_gender">
+
+      <label for="veteran">Veteran Status</label>
+      <select id="veteran" name="eeo_veteran">
+        <option value=""></option>
+        <option value="not">I am not a protected veteran</option>
+      </select>
+
+      <label for="disability">Disability Status</label>
+      <select id="disability" name="eeo_disability">
+        <option value=""></option>
+        <option value="no">No, I do not have a disability</option>
+      </select>
+    </fieldset>
+
+    <button type="submit">Submit application</button>
+  </form>
+</body>
+</html>
