@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { fillSignIn, loadCredentials } from './credentials';
 import {
   fillField,
   isCaptchaPresent,
@@ -15,9 +16,12 @@ import { AtsHandler, FillResult, emptyResult } from './types';
  * application questions -> voluntary disclosures -> review), usually behind
  * an account sign-in. This handler deliberately covers ONLY the first form
  * page it lands on — it fills what maps to the Profile, then hands the rest
- * of the wizard to the human. It never clicks Next/Continue, never touches
- * the sign-in form (no credential field is ever filled), and as everywhere
- * else: no submit, no CAPTCHA handling, EEO questions untouched.
+ * of the wizard to the human. It never clicks Next/Continue, and as
+ * everywhere else: no submit, no CAPTCHA handling, EEO questions untouched.
+ * Sign-in is manual by default; if the user opts in via
+ * config/credentials.json, the sign-in form is filled and submitted with
+ * their own credentials (account creation still stops before the ToS
+ * checkbox / Create Account click — see credentials.ts).
  *
  * Field lookup is by accessible label first, with Workday's long-stable
  * `data-automation-id` attributes as fallbacks (these survive Workday's UI
@@ -27,6 +31,15 @@ import { AtsHandler, FillResult, emptyResult } from './types';
  * originally were, fixture-tested only. Expect a correction round: report
  * the exact label/behavior of anything skipped or wrong.
  */
+async function hasVisiblePasswordField(page: Page): Promise<boolean> {
+  const passwordFields = page.locator('input[type="password"]');
+  const count = await passwordFields.count().catch(() => 0);
+  for (let i = 0; i < count; i++) {
+    if (await passwordFields.nth(i).isVisible().catch(() => false)) return true;
+  }
+  return false;
+}
+
 export const workday: AtsHandler = {
   name: 'Workday (first page only)',
 
@@ -51,18 +64,38 @@ export const workday: AtsHandler = {
     }
 
     // Workday tenants usually gate the application behind account
-    // sign-in/creation. Credentials are never auto-filled — if a password
-    // field is visible, stop and hand over to the human. (Re-running
-    // `npm run apply` after signing in works: the handler only acts on
-    // whatever page is in front of it.)
-    const passwordFields = page.locator('input[type="password"]');
-    const pwCount = await passwordFields.count().catch(() => 0);
-    for (let i = 0; i < pwCount; i++) {
-      if (await passwordFields.nth(i).isVisible().catch(() => false)) {
+    // sign-in/creation. By default that's left to the human; if the user has
+    // opted in via config/credentials.json (see credentials.ts — their own
+    // account, their own machine), the sign-in form is filled and submitted
+    // for them. Account creation is never fully automated: the ToS checkbox
+    // and Create Account button always stay with the human.
+    if (await hasVisiblePasswordField(page)) {
+      const creds = loadCredentials('workday');
+      if (!creds) {
         result.notes.push(
-          'This Workday tenant is asking you to sign in / create an account first. ' +
-            'Credentials are never auto-filled — sign in yourself, navigate to the application ' +
-            'form, then re-run this command to fill it.',
+          'This Workday tenant is asking you to sign in / create an account first — do that ' +
+            'yourself, navigate to the application form, then re-run this command to fill it. ' +
+            '(Optional: copy config/credentials.example.json to config/credentials.json to let ' +
+            'this step sign in for you.)',
+        );
+        return result;
+      }
+
+      const outcome = await fillSignIn(page, creds, profile.email, result);
+      if (outcome !== 'signed-in') return result;
+
+      if (await isCaptchaPresent(page)) {
+        result.notes.push(
+          'A CAPTCHA / verification challenge appeared after signing in — the form was not ' +
+            'filled. Solve it yourself, then re-run this command.',
+        );
+        return result;
+      }
+      if (await hasVisiblePasswordField(page)) {
+        result.notes.push(
+          'Still on the sign-in page after submitting credentials — they may be wrong for this ' +
+            'tenant, or extra verification is needed. Finish signing in yourself, then re-run ' +
+            'this command.',
         );
         return result;
       }

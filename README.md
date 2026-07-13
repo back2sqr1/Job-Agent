@@ -97,10 +97,19 @@ What it does:
 3. Detects the ATS by hostname — **Greenhouse** (`job-boards.greenhouse.io`,
    `boards.greenhouse.io`), **Lever** (`jobs.lever.co`), **Ashby**
    (`jobs.ashbyhq.com`), and **Workday** (`*.myworkdayjobs.com` — first form
-   page only; Workday is a multi-step wizard, usually behind a sign-in that
-   you complete yourself, and the remaining steps stay manual) have real
-   handlers; everything else (iCIMS, SmartRecruiters, custom sites, ...)
-   falls back to "page is open, fill it in yourself".
+   page only; Workday is a multi-step wizard, usually behind a sign-in, and
+   the remaining steps stay manual) have real handlers; everything else
+   (iCIMS, SmartRecruiters, custom sites, ...) falls back to "page is open,
+   fill it in yourself".
+
+   Workday sign-in is manual by default. Optionally, copy
+   `config/credentials.example.json` to `config/credentials.json`
+   (gitignored) to have the tool sign in to Workday tenants with your own
+   account: it fills email + password and clicks Sign In. The password sits
+   in **plaintext on your disk** (consider `chmod 600`), is never printed or
+   logged, and account *creation* is never fully automated — the
+   terms-of-service checkbox and Create Account button are always left to
+   you. Delete the file to turn the feature off.
 4. Fills the fields that map directly to your profile (name, email, phone,
    location, links, resume upload) and prints a summary of what was filled
    vs skipped. Free-text questions ("Why do you want to work here?") are

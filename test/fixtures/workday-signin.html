@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sign In — Acme Corp Careers (Workday sign-in fixture)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, button { display: block; width: 100%; padding: 6px; margin-top: 4px; }
+    #application-form { display: none; }
+  </style>
+</head>
+<body>
+  <!--
+    Fixture for Workday's sign-in wall. Clicking Sign In hides the wall and
+    reveals the application form, simulating the post-login navigation. The
+    credential-fill tests drive this via fillSignIn(); the revealed form is
+    then fillable by the normal workday handler, mirroring the real
+    "sign in, then fill" sequence.
+  -->
+  <div id="signin-wall">
+    <h1>Sign In</h1>
+
+    <label for="signin-email">Email Address</label>
+    <input type="email" id="signin-email" data-automation-id="email" name="email">
+
+    <label for="signin-password">Password</label>
+    <input type="password" id="signin-password" data-automation-id="password" name="password">
+
+    <button type="button" id="signin-button" data-automation-id="signInSubmitButton">Sign In</button>
+  </div>
+
+  <div id="application-form">
+    <h1>Apply — My Information (Step 1 of 5)</h1>
+
+    <label for="first-name">First Name *</label>
+    <input type="text" id="first-name" data-automation-id="legalNameSection_firstName" name="firstName">
+
+    <label for="last-name">Last Name *</label>
+    <input type="text" id="last-name" data-automation-id="legalNameSection_lastName" name="lastName">
+
+    <label for="app-email">Email Address *</label>
+    <input type="email" id="app-email" name="appEmail">
+
+    <label for="phone">Phone Number *</label>
+    <input type="tel" id="phone" data-automation-id="phone-number" name="phone">
+  </div>
+
+  <script>
+    document.getElementById('signin-button').addEventListener('click', function () {
+      var email = document.getElementById('signin-email').value;
+      var pw = document.getElementById('signin-password').value;
+      if (!email || !pw) return; // real walls don't proceed on empty fields
+      document.getElementById('signin-wall').style.display = 'none';
+      document.getElementById('application-form').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

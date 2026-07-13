@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, Page } from 'playwright';
 import { ashby } from '../src/ats/ashby';
+import { fillSignIn, loadCredentials } from '../src/ats/credentials';
 import { detectHandler } from '../src/ats/detect';
 import { greenhouse } from '../src/ats/greenhouse';
 import { fillField } from '../src/ats/helpers';
@@ -324,6 +325,83 @@ async function testWorkdaySignInWall(page: Page): Promise<void> {
   );
 }
 
+async function testWorkdayCredentialSignIn(page: Page): Promise<void> {
+  console.log('\nWorkday credentials (opt-in): signs in, then the normal fill works:');
+  check(
+    'loadCredentials returns null for a missing file (feature off by default)',
+    loadCredentials('workday', path.join(ROOT, 'no-such-credentials.json')) === null,
+  );
+
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday-signin.html')).href);
+  const result = emptyResult();
+  const outcome = await fillSignIn(
+    page,
+    { password: 'test-secret-pw' }, // email omitted -> falls back to profile email
+    profile.email,
+    result,
+  );
+
+  check('outcome is signed-in', outcome === 'signed-in');
+  check('sign-in wall is gone after the click', !(await page.locator('#signin-wall').isVisible()));
+  check('application form revealed', await page.locator('#application-form').isVisible());
+  check(
+    'email fell back to the profile email',
+    (await value(page, '#signin-email')) === 'testy@example.com',
+  );
+  check(
+    'password value never appears in any note',
+    result.notes.every((n) => !n.includes('test-secret-pw')),
+  );
+
+  // The "re-run after sign-in" story: the handler now sees the form, no wall.
+  const fillResult = await workday.fill(page, profile);
+  check(
+    'First Name filled after sign-in',
+    (await value(page, '#first-name')) === 'Testy',
+  );
+  check(
+    'filled list looks right post-sign-in',
+    ['First Name', 'Last Name', 'Email', 'Phone'].every((f) => fillResult.filled.includes(f)),
+  );
+}
+
+async function testWorkdayAccountCreation(page: Page): Promise<void> {
+  console.log('\nWorkday credentials: account creation stops before ToS/Create Account:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday-signin.html')).href);
+  // Turn the wall into a create-account form: add a confirm-password field
+  // and a ToS checkbox that must never be ticked by the tool.
+  await page.evaluate(() => {
+    const wall = document.getElementById('signin-wall')!;
+    const confirm = document.createElement('input');
+    confirm.type = 'password';
+    confirm.id = 'confirm-password';
+    wall.appendChild(confirm);
+    const tos = document.createElement('input');
+    tos.type = 'checkbox';
+    tos.id = 'tos-checkbox';
+    wall.appendChild(tos);
+  });
+
+  const result = emptyResult();
+  const outcome = await fillSignIn(page, { password: 'test-secret-pw' }, profile.email, result);
+
+  check('outcome is account-creation', outcome === 'account-creation');
+  check('password filled', (await value(page, '#signin-password')) === 'test-secret-pw');
+  check('confirm-password filled too', (await value(page, '#confirm-password')) === 'test-secret-pw');
+  check(
+    'ToS checkbox NOT ticked',
+    !(await page.locator('#tos-checkbox').isChecked()),
+  );
+  check(
+    'no button was clicked — the wall is still showing',
+    await page.locator('#signin-wall').isVisible(),
+  );
+  check(
+    'note hands ToS + Create Account to the human',
+    result.notes.some((n) => /terms/i.test(n) && /create account/i.test(n)),
+  );
+}
+
 async function testLever(page: Page): Promise<void> {
   console.log('\nLever handler vs test/fixtures/lever.html:');
   await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'lever.html')).href);
@@ -491,6 +569,8 @@ async function main(): Promise<void> {
     await testLever(page);
     await testWorkday(page);
     await testWorkdaySignInWall(page);
+    await testWorkdayCredentialSignIn(page);
+    await testWorkdayAccountCreation(page);
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);
     await testCaptchaDuringLocationFill(page);

@@ -9,6 +9,7 @@ data/*
 # Personal config — only the *.example.* templates are tracked
 config/filters.yaml
 config/profile.json
+config/credentials.json
 
 # Resume files (Phase 2) — never commit real documents
 resumes/
