@@ -134,8 +134,19 @@ export async function fillField(page: Page, spec: FieldSpec, result: FillResult)
  * otherwise, if the page has exactly one file input, use it. If there are
  * several and none is identifiably the resume (e.g. resume + cover letter,
  * neither labelled), skip rather than guess wrong. File inputs are often
- * hidden behind styled buttons, so no visibility requirement here —
- * setInputFiles works on hidden inputs.
+ * hidden behind styled buttons, so no visibility requirement here.
+ *
+ * Some ATS's (confirmed live on Greenhouse) bind upload state to an actual
+ * click on the file input and throw when a file just appears on it without
+ * that click ever happening ("Cannot read properties of undefined (reading
+ * 'uploadFile')") — their JS was expecting to initialize an uploader object
+ * on click, before the change event fires. So this clicks the (possibly
+ * hidden) input for real and intercepts the resulting native file-chooser
+ * dialog via Playwright's `filechooser` event, rather than writing to the
+ * input directly — that's a real click, so whatever the site's onClick does
+ * still happens. Falls back to setting the input directly for pages with no
+ * such click handler (a plain file input never fires `filechooser` from a
+ * forced click in that case, so the click leg just times out harmlessly).
  */
 export async function uploadResume(
   page: Page,
@@ -166,6 +177,21 @@ export async function uploadResume(
     result.skipped.push('Resume');
     return false;
   }
+
+  try {
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser', { timeout: 5_000 }),
+      target.click({ force: true, timeout: 3_000 }),
+    ]);
+    await chooser.setFiles(resumePath);
+    result.filled.push('Resume');
+    result.resumeUploaded = true;
+    return true;
+  } catch {
+    // No filechooser fired (or the click itself failed) — fall back to
+    // writing the input directly.
+  }
+
   try {
     await target.setInputFiles(resumePath, { timeout: 10_000 });
     result.filled.push('Resume');
