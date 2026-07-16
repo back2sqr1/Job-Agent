@@ -107,9 +107,14 @@ What it does:
    (gitignored) to have the tool sign in to Workday tenants with your own
    account: it fills email + password and clicks Sign In. The password sits
    in **plaintext on your disk** (consider `chmod 600`), is never printed or
-   logged, and account *creation* is never fully automated — the
-   terms-of-service checkbox and Create Account button are always left to
-   you. Delete the file to turn the feature off.
+   logged. By default account *creation* still stops before the
+   terms-of-service checkbox and Create Account button; setting
+   `"createAccounts": true` in the file is a second, separate opt-in that
+   automates those too (when sign-in bounces on a tenant with no account
+   yet, it pivots to Create Account, agrees to the terms **on your
+   delegation**, and creates the account — marketing checkboxes are never
+   ticked, and email-verification codes remain yours to enter). Delete the
+   file to turn the whole feature off.
 4. Fills the fields that map directly to your profile (name, email, phone,
    location, links, resume upload) and prints a summary of what was filled
    vs skipped. Free-text questions ("Why do you want to work here?") are

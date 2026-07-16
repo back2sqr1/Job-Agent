@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, Page } from 'playwright';
@@ -366,40 +367,69 @@ async function testWorkdayCredentialSignIn(page: Page): Promise<void> {
 }
 
 async function testWorkdayAccountCreation(page: Page): Promise<void> {
-  console.log('\nWorkday credentials: account creation stops before ToS/Create Account:');
+  console.log('\nWorkday credentials: account creation stops before ToS (createAccounts off):');
   await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday-signin.html')).href);
-  // Turn the wall into a create-account form: add a confirm-password field
-  // and a ToS checkbox that must never be ticked by the tool.
-  await page.evaluate(() => {
-    const wall = document.getElementById('signin-wall')!;
-    const confirm = document.createElement('input');
-    confirm.type = 'password';
-    confirm.id = 'confirm-password';
-    wall.appendChild(confirm);
-    const tos = document.createElement('input');
-    tos.type = 'checkbox';
-    tos.id = 'tos-checkbox';
-    wall.appendChild(tos);
-  });
+  await page.click('#create-account-link');
 
   const result = emptyResult();
   const outcome = await fillSignIn(page, { password: 'test-secret-pw' }, profile.email, result);
 
   check('outcome is account-creation', outcome === 'account-creation');
-  check('password filled', (await value(page, '#signin-password')) === 'test-secret-pw');
-  check('confirm-password filled too', (await value(page, '#confirm-password')) === 'test-secret-pw');
+  check('password filled', (await value(page, '#create-password')) === 'test-secret-pw');
+  check('confirm-password filled too', (await value(page, '#create-confirm')) === 'test-secret-pw');
+  check('ToS checkbox NOT ticked', !(await page.locator('#tos-agree').isChecked()));
   check(
-    'ToS checkbox NOT ticked',
-    !(await page.locator('#tos-checkbox').isChecked()),
-  );
-  check(
-    'no button was clicked — the wall is still showing',
-    await page.locator('#signin-wall').isVisible(),
+    'Create Account not clicked — the creation wall is still showing',
+    await page.locator('#create-wall').isVisible(),
   );
   check(
     'note hands ToS + Create Account to the human',
     result.notes.some((n) => /terms/i.test(n) && /create account/i.test(n)),
   );
+}
+
+async function testWorkdayCreateAccountsOptIn(page: Page): Promise<void> {
+  console.log('\nWorkday credentials: createAccounts opt-in pivots and creates the account end-to-end:');
+  // Full handler path: real credentials file (temp, via JOB_AGENT_CREDENTIALS
+  // so the user's config/credentials.json is never touched) with the
+  // createAccounts flag on, against a tenant where sign-in bounces because
+  // no account exists yet.
+  const tmpCreds = path.join(os.tmpdir(), `job-agent-test-creds-${process.pid}.json`);
+  writeFileSync(
+    tmpCreds,
+    JSON.stringify({
+      workday: { email: 'testy@example.com', password: 'test-secret-pw', createAccounts: true },
+    }),
+  );
+  process.env.JOB_AGENT_CREDENTIALS = tmpCreds;
+  try {
+    await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday-signin.html')).href);
+    await page.evaluate(() => {
+      (window as unknown as { NO_ACCOUNT_EXISTS: boolean }).NO_ACCOUNT_EXISTS = true;
+    });
+
+    const result = await workday.fill(page, profile);
+
+    check('ToS agreement checkbox ticked (that is what the opt-in delegates)', await page.locator('#tos-agree').isChecked());
+    check('marketing checkbox NOT ticked', !(await page.locator('#marketing-optin').isChecked()));
+    check('account created — application form revealed', await page.locator('#application-form').isVisible());
+    check(
+      'note records the pivot to account creation',
+      result.notes.some((n) => /sign-in bounced/i.test(n)),
+    );
+    check(
+      'note records the account creation + email-verification heads-up',
+      result.notes.some((n) => /created an account/i.test(n) && /verification/i.test(n)),
+    );
+    check('form filled after account creation', (await value(page, '#first-name')) === 'Testy');
+    check(
+      'password value never appears in any note',
+      result.notes.every((n) => !n.includes('test-secret-pw')),
+    );
+  } finally {
+    delete process.env.JOB_AGENT_CREDENTIALS;
+    unlinkSync(tmpCreds);
+  }
 }
 
 async function testLever(page: Page): Promise<void> {
@@ -571,6 +601,7 @@ async function main(): Promise<void> {
     await testWorkdaySignInWall(page);
     await testWorkdayCredentialSignIn(page);
     await testWorkdayAccountCreation(page);
+    await testWorkdayCreateAccountsOptIn(page);
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);
     await testCaptchaDuringLocationFill(page);

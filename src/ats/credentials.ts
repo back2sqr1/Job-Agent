@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { ROOT } from '../core/scan';
+import { contextText } from './helpers';
 import { FillResult } from './types';
 
 /**
@@ -19,11 +20,25 @@ export interface AtsCredentials {
   /** Sign-in email. Falls back to the profile email if omitted. */
   email?: string;
   password: string;
+  /**
+   * Second, separate opt-in: when true, account-creation forms are completed
+   * fully automatically — including ticking the "I agree to the terms"
+   * checkbox and clicking Create Account. Setting this flag IS you
+   * delegating that terms-of-service agreement to the tool; leave it off
+   * (the default) to keep the ToS checkbox and final click manual.
+   */
+  createAccounts?: boolean;
 }
 
 export class CredentialsError extends Error {}
 
-export const CREDENTIALS_PATH = path.join(ROOT, 'config', 'credentials.json');
+/**
+ * Resolved at call time (not import time) so tests can point at a temp file
+ * via JOB_AGENT_CREDENTIALS without ever touching the user's real config.
+ */
+export function credentialsPath(): string {
+  return process.env.JOB_AGENT_CREDENTIALS ?? path.join(ROOT, 'config', 'credentials.json');
+}
 
 /**
  * Load credentials for one ATS key (e.g. "workday"). Returns null when the
@@ -31,7 +46,7 @@ export const CREDENTIALS_PATH = path.join(ROOT, 'config', 'credentials.json');
  * "feature not enabled" and fall back to manual sign-in. Malformed content
  * throws, same fail-loud pattern as the profile/filter loaders.
  */
-export function loadCredentials(key: string, filePath: string = CREDENTIALS_PATH): AtsCredentials | null {
+export function loadCredentials(key: string, filePath: string = credentialsPath()): AtsCredentials | null {
   if (!existsSync(filePath)) return null;
 
   let doc: unknown;
@@ -57,8 +72,15 @@ export function loadCredentials(key: string, filePath: string = CREDENTIALS_PATH
   if ('email' in obj && (typeof obj['email'] !== 'string' || obj['email'] === '')) {
     throw new CredentialsError(`${filePath}: "${key}.email" must be a non-empty string if present`);
   }
+  if ('createAccounts' in obj && typeof obj['createAccounts'] !== 'boolean') {
+    throw new CredentialsError(`${filePath}: "${key}.createAccounts" must be true or false if present`);
+  }
 
-  return { email: obj['email'] as string | undefined, password: obj['password'] };
+  return {
+    email: obj['email'] as string | undefined,
+    password: obj['password'],
+    createAccounts: obj['createAccounts'] === true,
+  };
 }
 
 /** Visible elements matched by a locator, in DOM order. */
@@ -75,7 +97,13 @@ async function visibleAll(loc: Locator): Promise<Locator[]> {
 export type SignInOutcome =
   | 'signed-in' // credentials filled AND the sign-in button was clicked
   | 'account-creation' // fields filled, but ToS/create-account left to the human
+  | 'account-created' // createAccounts opt-in: ToS agreed + Create Account clicked
   | 'failed'; // couldn't fill — human takes over
+
+/** Checkbox labels that read as a terms/privacy agreement — the ONLY kind of
+ * checkbox the createAccounts flow will tick. Anything else (marketing
+ * opt-ins, job-alert subscriptions, ...) is left alone. */
+const TOS_PATTERN = /\bagree|terms\s+(of|and)|terms of (use|service)|privacy (policy|statement)/i;
 
 /**
  * Fill an ATS sign-in / account-creation form with the user's own
@@ -133,12 +161,49 @@ export async function fillSignIn(
   if (passwordsFilled === 0) return 'failed';
 
   if (passwords.length >= 2) {
+    if (!creds.createAccounts) {
+      result.notes.push(
+        'Account-creation form detected: your email and password were filled in, but the ' +
+          'terms-of-service checkbox and the Create Account button are left to you. Finish account ' +
+          'creation, get to the application form, then re-run this command. (Optional: set ' +
+          '"createAccounts": true in config/credentials.json to automate this step too.)',
+      );
+      return 'account-creation';
+    }
+
+    // createAccounts opt-in: tick agreement checkboxes (ONLY ones whose
+    // label reads as terms/privacy — marketing opt-ins stay untouched) and
+    // click Create Account. Setting the flag is the user's delegation of
+    // that agreement; see AtsCredentials.createAccounts.
+    for (const box of await visibleAll(page.locator('input[type="checkbox"]'))) {
+      try {
+        if (TOS_PATTERN.test(await contextText(box)) && !(await box.isChecked())) {
+          await box.check({ timeout: 3_000 });
+        }
+      } catch {
+        // leave it for the human; the Create Account click below may then
+        // fail validation, which the wall re-check surfaces
+      }
+    }
+    try {
+      await page
+        .getByRole('button', { name: /create\s*account|sign\s*up|register/i })
+        .first()
+        .click({ timeout: 3_000 });
+    } catch {
+      result.notes.push(
+        'Filled the account-creation form but no Create Account button was found — click it ' +
+          'yourself, then re-run this command.',
+      );
+      return 'account-creation';
+    }
+    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+    await page.waitForTimeout(500);
     result.notes.push(
-      'Account-creation form detected: your email and password were filled in, but the ' +
-        'terms-of-service checkbox and the Create Account button are left to you. Finish account ' +
-        'creation, get to the application form, then re-run this command.',
+      'Created an account with the credentials from config/credentials.json (createAccounts is ' +
+        'on). If the tenant asks for an email verification code, that step is yours.',
     );
-    return 'account-creation';
+    return 'account-created';
   }
 
   if (!emailFilled) {
@@ -166,6 +231,6 @@ export async function fillSignIn(
   // what the resulting page is (application form, still the wall, a CAPTCHA).
   await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
   await page.waitForTimeout(500);
-  result.notes.push('Signed in with the credentials from config/credentials.json.');
+  result.notes.push('Submitted the sign-in form with the credentials from config/credentials.json.');
   return 'signed-in';
 }

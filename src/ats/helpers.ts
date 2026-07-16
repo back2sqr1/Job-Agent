@@ -78,7 +78,7 @@ export interface FieldSpec {
  * <label for>, wrapping <label>, plus id/name attributes. Used both to find
  * the resume input and to enforce the EEO guard.
  */
-async function contextText(el: Locator): Promise<string> {
+export async function contextText(el: Locator): Promise<string> {
   try {
     return await el.evaluate((node) => {
       const e = node as HTMLElement;

@@ -28,6 +28,26 @@
     <input type="password" id="signin-password" data-automation-id="password" name="password">
 
     <button type="button" id="signin-button" data-automation-id="signInSubmitButton">Sign In</button>
+
+    <a href="#" id="create-account-link" data-automation-id="createAccountLink">Create Account</a>
+  </div>
+
+  <div id="create-wall" style="display: none;">
+    <h1>Create Account</h1>
+
+    <label for="create-email">Email Address</label>
+    <input type="email" id="create-email" name="createEmail">
+
+    <label for="create-password">Password</label>
+    <input type="password" id="create-password" name="createPassword">
+
+    <label for="create-confirm">Verify New Password</label>
+    <input type="password" id="create-confirm" name="createConfirm">
+
+    <label><input type="checkbox" id="tos-agree"> I agree to the Terms of Use and Privacy Policy</label>
+    <label><input type="checkbox" id="marketing-optin"> Send me job alerts and marketing emails</label>
+
+    <button type="button" id="create-button">Create Account</button>
   </div>
 
   <div id="application-form">
@@ -47,11 +67,33 @@
   </div>
 
   <script>
+    // window.NO_ACCOUNT_EXISTS simulates a tenant where these credentials
+    // have no account yet: Sign In bounces instead of proceeding. Tests set
+    // it via page.evaluate before running the handler.
     document.getElementById('signin-button').addEventListener('click', function () {
       var email = document.getElementById('signin-email').value;
       var pw = document.getElementById('signin-password').value;
       if (!email || !pw) return; // real walls don't proceed on empty fields
+      if (window.NO_ACCOUNT_EXISTS) return; // bounce: wall stays up
       document.getElementById('signin-wall').style.display = 'none';
+      document.getElementById('application-form').style.display = 'block';
+    });
+
+    document.getElementById('create-account-link').addEventListener('click', function (e) {
+      e.preventDefault();
+      document.getElementById('signin-wall').style.display = 'none';
+      document.getElementById('create-wall').style.display = 'block';
+    });
+
+    document.getElementById('create-button').addEventListener('click', function () {
+      var email = document.getElementById('create-email').value;
+      var pw = document.getElementById('create-password').value;
+      var confirm = document.getElementById('create-confirm').value;
+      var agreed = document.getElementById('tos-agree').checked;
+      // Real tenants refuse creation without the ToS agreement — so this
+      // only proceeds if the flow actually ticked the box.
+      if (!email || !pw || pw !== confirm || !agreed) return;
+      document.getElementById('create-wall').style.display = 'none';
       document.getElementById('application-form').style.display = 'block';
     });
   </script>

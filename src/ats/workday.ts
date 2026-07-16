@@ -31,6 +31,23 @@ import { AtsHandler, FillResult, emptyResult } from './types';
  * originally were, fixture-tested only. Expect a correction round: report
  * the exact label/behavior of anything skipped or wrong.
  */
+/** Click the sign-in page's "Create Account" link/button, if there is one. */
+async function clickCreateAccountLink(page: Page): Promise<boolean> {
+  const byRole = (role: 'link' | 'button') =>
+    page.getByRole(role, { name: /create\s*account|sign\s*up/i }).first();
+  for (const candidate of [byRole('link'), byRole('button')]) {
+    try {
+      await candidate.click({ timeout: 3_000 });
+      await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      return true;
+    } catch {
+      // try the next shape
+    }
+  }
+  return false;
+}
+
 async function hasVisiblePasswordField(page: Page): Promise<boolean> {
   const passwordFields = page.locator('input[type="password"]');
   const count = await passwordFields.count().catch(() => 0);
@@ -81,8 +98,28 @@ export const workday: AtsHandler = {
         return result;
       }
 
-      const outcome = await fillSignIn(page, creds, profile.email, result);
-      if (outcome !== 'signed-in') return result;
+      let outcome = await fillSignIn(page, creds, profile.email, result);
+
+      // Sign-in submitted but the wall is still up — on a tenant where no
+      // account exists yet that's the expected bounce. With createAccounts
+      // on, pivot to the Create Account form and let fillSignIn complete it
+      // (it agrees to the ToS and clicks Create Account per that opt-in).
+      if (
+        outcome === 'signed-in' &&
+        creds.createAccounts &&
+        !(await isCaptchaPresent(page)) &&
+        (await hasVisiblePasswordField(page))
+      ) {
+        result.notes.push(
+          'Sign-in bounced (probably no account on this tenant yet) — trying account creation, ' +
+            'since createAccounts is on.',
+        );
+        if (await clickCreateAccountLink(page)) {
+          outcome = await fillSignIn(page, creds, profile.email, result);
+        }
+      }
+
+      if (outcome !== 'signed-in' && outcome !== 'account-created') return result;
 
       if (await isCaptchaPresent(page)) {
         result.notes.push(
@@ -93,9 +130,9 @@ export const workday: AtsHandler = {
       }
       if (await hasVisiblePasswordField(page)) {
         result.notes.push(
-          'Still on the sign-in page after submitting credentials — they may be wrong for this ' +
-            'tenant, or extra verification is needed. Finish signing in yourself, then re-run ' +
-            'this command.',
+          'Still on the sign-in/creation page after submitting credentials — they may be wrong ' +
+            'for this tenant, or email verification is needed. Finish signing in yourself, then ' +
+            're-run this command.',
         );
         return result;
       }
