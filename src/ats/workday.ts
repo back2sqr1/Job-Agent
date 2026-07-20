@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { sweepAutofill } from './autofill';
 import { handleSignInWall } from './credentials';
 import {
   fillField,
@@ -137,6 +138,10 @@ export const workday: AtsHandler = {
     // are Workday custom dropdowns (button-driven, not plain inputs) — the
     // helpers refuse those by design, so they land in `skipped` for the
     // human to pick. Address line / postal code aren't in the Profile.
+
+    // Generic sweep: catch profile-mappable text inputs this handler's
+    // patterns missed on whatever page the tenant shows.
+    await sweepAutofill(page, profile, result);
 
     result.notes.push(
       'Workday support covers this first page only — continue through the remaining wizard ' +

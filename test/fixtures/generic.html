@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Software Intern — Acme Corp (generic/unknown-ATS fixture)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, select, textarea { display: block; width: 100%; padding: 6px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <!--
+    Fixture for the generic autofill sweep: an unknown/custom career site
+    whose field labels are deliberately worded differently from the
+    conventions the per-ATS handlers look for. The sweep must classify by
+    context (label/placeholder/name) rather than by expected label strings.
+  -->
+  <h1>Apply — Software Intern</h1>
+
+  <form>
+    <label for="given">Given name</label>
+    <input type="text" id="given" name="given">
+
+    <label for="surname">Surname</label>
+    <input type="text" id="surname" name="surname">
+
+    <label for="mail">E-mail address</label>
+    <input type="email" id="mail" name="mail">
+
+    <label for="mail2">Confirm e-mail address</label>
+    <input type="email" id="mail2" name="mail2">
+
+    <label for="mobile">Mobile number</label>
+    <input type="tel" id="mobile" name="mobile">
+
+    <label for="based">Where are you currently based?</label>
+    <input type="text" id="based" name="based">
+
+    <!-- No <label>: placeholder-only, as sloppy custom sites often do -->
+    <input type="url" id="li" name="li" placeholder="LinkedIn profile URL">
+
+    <label for="alma">Alma mater</label>
+    <input type="text" id="alma" name="alma">
+
+    <label for="resume">Résumé</label>
+    <input type="file" id="resume" name="resume">
+
+    <!-- Already filled by the site: must never be overwritten -->
+    <label for="ref">Reference code</label>
+    <input type="text" id="ref" name="ref" value="JOB-1234">
+
+    <!-- Company field: must NOT be caught by the name matchers -->
+    <label for="company">Current company name</label>
+    <input type="text" id="company" name="company">
+
+    <!-- Unmatched: must be named in the notes, not guessed at -->
+    <label for="salary">Expected compensation</label>
+    <input type="text" id="salary" name="salary">
+
+    <!-- Free text: never written -->
+    <label for="why">Why do you want this role?</label>
+    <textarea id="why" name="why" rows="4"></textarea>
+
+    <!-- EEO: never touched, never listed -->
+    <label for="gender">Gender identity (voluntary)</label>
+    <input type="text" id="gender" name="gender">
+
+    <button type="submit">Submit</button>
+  </form>
+</body>
+</html>

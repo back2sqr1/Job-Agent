@@ -99,8 +99,18 @@ What it does:
    (`jobs.ashbyhq.com`), and **Workday** (`*.myworkdayjobs.com` — first form
    page only; Workday is a multi-step wizard, usually behind a sign-in, and
    the remaining steps stay manual) have real handlers; everything else
-   (iCIMS, SmartRecruiters, custom sites, ...) falls back to "page is open,
-   fill it in yourself".
+   (iCIMS, SmartRecruiters, custom sites, ...) gets the **generic autofill
+   sweep**: every fillable input on the page is classified by its
+   label/placeholder/context and filled when it maps unambiguously to your
+   profile. The dedicated handlers also run the sweep after their own
+   pass, so unusually-worded fields get caught everywhere. Fields nothing
+   maps to are named in the fill summary rather than silently skipped.
+   Optionally, set the `ANTHROPIC_API_KEY` environment variable to let
+   Claude (via the Anthropic API, billed to your key) classify unusual
+   labels the built-in heuristics can't — only the form's field labels are
+   sent, never your profile data, and every fill still passes the same
+   safety rails (EEO questions hard-refused, no free text, no dropdown
+   guessing, no submit).
 
    Workday sign-in is manual by default. Optionally, copy
    `config/credentials.example.json` to `config/credentials.json`

@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { sweepAutofill } from './autofill';
 import { handleSignInWall } from './credentials';
 import {
   countBlankTextareas,
@@ -152,6 +153,10 @@ export const ashby: AtsHandler = {
     // company-specific fields are deliberately left alone — they don't map
     // unambiguously to a Profile field, and free text is never generated on
     // the user's behalf.
+
+    // Generic sweep: catch profile-mappable fields this handler's label
+    // patterns missed (unusually-worded labels, posting-specific questions).
+    await sweepAutofill(page, profile, result);
 
     const blanks = await countBlankTextareas(page);
     const note = customQuestionNote(blanks);

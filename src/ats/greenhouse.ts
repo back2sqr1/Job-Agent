@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { sweepAutofill } from './autofill';
 import {
   countBlankTextareas,
   customQuestionNote,
@@ -146,6 +147,10 @@ export const greenhouse: AtsHandler = {
       },
       result,
     );
+
+    // Generic sweep: catch profile-mappable fields this handler's label
+    // patterns missed (unusually-worded labels, tenant-specific questions).
+    await sweepAutofill(page, profile, result);
 
     const blanks = await countBlankTextareas(page);
     const note = customQuestionNote(blanks);

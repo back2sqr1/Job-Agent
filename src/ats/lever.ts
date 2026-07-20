@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { sweepAutofill } from './autofill';
 import {
   countBlankTextareas,
   customQuestionNote,
@@ -168,6 +169,10 @@ export const lever: AtsHandler = {
     // "Current company", "Additional information", and any custom questions
     // are deliberately not filled: they don't map unambiguously to a Profile
     // field, and free text is never written on the user's behalf.
+
+    // Generic sweep: catch profile-mappable fields this handler's label
+    // patterns missed (unusually-worded labels, posting-specific questions).
+    await sweepAutofill(page, profile, result);
 
     const blanks = await countBlankTextareas(page);
     const note = customQuestionNote(blanks);

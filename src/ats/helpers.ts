@@ -109,7 +109,7 @@ export async function contextText(el: Locator): Promise<string> {
  *     inputs, and — deliberately — textareas: free-text answers are never
  *     generated or filled on the user's behalf).
  */
-async function tryFillElement(el: Locator, value: string): Promise<boolean> {
+export async function tryFillElement(el: Locator, value: string): Promise<boolean> {
   try {
     if (!(await el.isVisible())) return false;
     if (EEO_PATTERN.test(await contextText(el))) return false;

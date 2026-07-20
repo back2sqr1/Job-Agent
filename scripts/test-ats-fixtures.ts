@@ -6,6 +6,7 @@ import { chromium, Page } from 'playwright';
 import { ashby } from '../src/ats/ashby';
 import { fillSignIn, loadCredentials } from '../src/ats/credentials';
 import { detectHandler } from '../src/ats/detect';
+import { fallback } from '../src/ats/fallback';
 import { greenhouse } from '../src/ats/greenhouse';
 import { fillField } from '../src/ats/helpers';
 import { lever } from '../src/ats/lever';
@@ -106,21 +107,21 @@ function testDetection(): void {
   check(
     'myworkdayjobs.com.evil.example is NOT Workday',
     detectHandler('https://acme.wd1.myworkdayjobs.com.evil.example/x').name ===
-      'Manual (unsupported ATS)',
+      'Generic (best-effort autofill)',
   );
   check(
     'icims.com -> fallback',
     detectHandler('https://careers-acme.icims.com/jobs/1234/job').name ===
-      'Manual (unsupported ATS)',
+      'Generic (best-effort autofill)',
   );
   check(
     'greenhouse.io.evil.example is NOT Greenhouse',
     detectHandler('https://job-boards.greenhouse.io.evil.example/x').name ===
-      'Manual (unsupported ATS)',
+      'Generic (best-effort autofill)',
   );
   check(
     'garbage URL -> fallback (no throw)',
-    detectHandler('not a url at all').name === 'Manual (unsupported ATS)',
+    detectHandler('not a url at all').name === 'Generic (best-effort autofill)',
   );
 }
 
@@ -620,7 +621,67 @@ async function testCaptchaDuringLocationFill(page: Page): Promise<void> {
   );
 }
 
+async function testGenericSweep(page: Page): Promise<void> {
+  console.log('\nGeneric sweep (fallback handler) vs test/fixtures/generic.html:');
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'generic.html')).href);
+  const result = await fallback.fill(page, profile);
+
+  // Labels deliberately worded differently from what any handler looks for —
+  // classified by context, not by expected label strings.
+  check('"Given name" filled with first name', (await value(page, '#given')) === 'Testy');
+  check('"Surname" filled with last name', (await value(page, '#surname')) === 'McTestface');
+  check('"E-mail address" filled', (await value(page, '#mail')) === 'testy@example.com');
+  check(
+    '"Confirm e-mail address" filled too (both email inputs)',
+    (await value(page, '#mail2')) === 'testy@example.com',
+  );
+  check('"Mobile number" filled with phone', (await value(page, '#mobile')) === '555-000-1111');
+  check(
+    '"Where are you currently based?" filled with city, state',
+    (await value(page, '#based')) === 'Testville, TS',
+  );
+  check(
+    'placeholder-only LinkedIn input filled (no label at all)',
+    (await value(page, '#li')) === 'https://www.linkedin.com/in/testy',
+  );
+  check('"Alma mater" filled with school', (await value(page, '#alma')) === 'Test University');
+
+  const resume = await attachedFile(page, '#resume');
+  check(
+    `Résumé attached via the generic flow (${RESUME_NAME})`,
+    resume !== null && resume.name === RESUME_NAME && resume.size > 0,
+  );
+
+  check('pre-filled reference code NOT overwritten', (await value(page, '#ref')) === 'JOB-1234');
+  check('"Current company name" NOT mistaken for the applicant name', (await value(page, '#company')) === '');
+  check('"Expected compensation" left blank (no matcher guesses)', (await value(page, '#salary')) === '');
+  check('free-text "Why do you want this role?" left blank', (await value(page, '#why')) === '');
+  check('EEO gender input NOT filled', (await value(page, '#gender')) === '');
+  check(
+    'EEO field NOT listed among fields needing attention',
+    !result.notes.some((n) => /gender/i.test(n)),
+  );
+  check(
+    'unmatched fields are NAMED in the notes, not silently dropped',
+    result.notes.some((n) => /need your attention/.test(n) && /Expected compensation/.test(n)),
+  );
+  check(
+    'note mentions the ANTHROPIC_API_KEY opt-in when no key is set',
+    result.notes.some((n) => /ANTHROPIC_API_KEY/.test(n)),
+  );
+  check(
+    'filled list looks right',
+    ['First Name', 'Last Name', 'Email', 'Phone', 'Location', 'LinkedIn', 'School', 'Resume'].every(
+      (f) => result.filled.includes(f),
+    ),
+  );
+}
+
 async function main(): Promise<void> {
+  // The sweep's LLM assist activates on ANTHROPIC_API_KEY — keep the test
+  // suite deterministic and fully offline regardless of the environment.
+  delete process.env.ANTHROPIC_API_KEY;
+
   if (!existsSync(RESUME)) {
     console.error(`Resume file not found at ${RESUME} — this test uploads a real PDF.`);
     process.exit(1);
@@ -643,6 +704,7 @@ async function main(): Promise<void> {
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);
     await testCaptchaDuringLocationFill(page);
+    await testGenericSweep(page);
   } finally {
     await browser.close();
   }
