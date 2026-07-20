@@ -432,6 +432,43 @@ async function testWorkdayCreateAccountsOptIn(page: Page): Promise<void> {
   }
 }
 
+async function testAshbySignInWall(page: Page): Promise<void> {
+  console.log('\nAshby handler: same shared wall flow (stop without creds, sign in with them):');
+  // No credentials -> stop at the wall, fill nothing.
+  await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday-signin.html')).href);
+  const noCreds = await ashby.fill(page, profile);
+  check('nothing filled behind a wall without credentials', noCreds.filled.length === 0);
+  check(
+    'note points at a credentials entry under the "ashby" key',
+    noCreds.notes.some((n) => /sign in/i.test(n) && /"ashby"/.test(n)),
+  );
+
+  // With credentials under the "ashby" key -> signs in and fills the form.
+  const tmpCreds = path.join(os.tmpdir(), `job-agent-test-ashby-creds-${process.pid}.json`);
+  writeFileSync(
+    tmpCreds,
+    JSON.stringify({ ashby: { email: 'testy@example.com', password: 'test-secret-pw' } }),
+  );
+  process.env.JOB_AGENT_CREDENTIALS = tmpCreds;
+  try {
+    await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'workday-signin.html')).href);
+    const result = await ashby.fill(page, profile);
+    check('signed in — application form revealed', await page.locator('#application-form').isVisible());
+    check('First Name filled after sign-in', (await value(page, '#first-name')) === 'Testy');
+    check(
+      'filled list looks right post-sign-in',
+      ['First Name', 'Last Name', 'Email', 'Phone'].every((f) => result.filled.includes(f)),
+    );
+    check(
+      'password value never appears in any note',
+      result.notes.every((n) => !n.includes('test-secret-pw')),
+    );
+  } finally {
+    delete process.env.JOB_AGENT_CREDENTIALS;
+    unlinkSync(tmpCreds);
+  }
+}
+
 async function testLever(page: Page): Promise<void> {
   console.log('\nLever handler vs test/fixtures/lever.html:');
   await page.goto(pathToFileURL(path.join(ROOT, 'test', 'fixtures', 'lever.html')).href);
@@ -602,6 +639,7 @@ async function main(): Promise<void> {
     await testWorkdayCredentialSignIn(page);
     await testWorkdayAccountCreation(page);
     await testWorkdayCreateAccountsOptIn(page);
+    await testAshbySignInWall(page);
     await testCaptchaGuard(page);
     await testCaptchaAfterResumeUpload(page);
     await testCaptchaDuringLocationFill(page);

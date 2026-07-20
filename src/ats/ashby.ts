@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { handleSignInWall } from './credentials';
 import {
   countBlankTextareas,
   customQuestionNote,
@@ -51,6 +52,13 @@ export const ashby: AtsHandler = {
         'A CAPTCHA / verification challenge is showing on this page — nothing was filled. ' +
           'Solve it yourself, then fill out the form by hand.',
       );
+      return result;
+    }
+
+    // Ashby applications are usually open (no account), but if this one is
+    // gated behind a sign-in, the shared wall flow resolves it (manual by
+    // default; opt-in credentials under an "ashby" key per credentials.ts).
+    if (!(await handleSignInWall(page, 'ashby', profile.email, result))) {
       return result;
     }
 

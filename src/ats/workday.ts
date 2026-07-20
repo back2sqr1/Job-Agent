@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { fillSignIn, loadCredentials } from './credentials';
+import { handleSignInWall } from './credentials';
 import {
   fillField,
   isCaptchaPresent,
@@ -31,32 +31,6 @@ import { AtsHandler, FillResult, emptyResult } from './types';
  * originally were, fixture-tested only. Expect a correction round: report
  * the exact label/behavior of anything skipped or wrong.
  */
-/** Click the sign-in page's "Create Account" link/button, if there is one. */
-async function clickCreateAccountLink(page: Page): Promise<boolean> {
-  const byRole = (role: 'link' | 'button') =>
-    page.getByRole(role, { name: /create\s*account|sign\s*up/i }).first();
-  for (const candidate of [byRole('link'), byRole('button')]) {
-    try {
-      await candidate.click({ timeout: 3_000 });
-      await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-      await page.waitForTimeout(300);
-      return true;
-    } catch {
-      // try the next shape
-    }
-  }
-  return false;
-}
-
-async function hasVisiblePasswordField(page: Page): Promise<boolean> {
-  const passwordFields = page.locator('input[type="password"]');
-  const count = await passwordFields.count().catch(() => 0);
-  for (let i = 0; i < count; i++) {
-    if (await passwordFields.nth(i).isVisible().catch(() => false)) return true;
-  }
-  return false;
-}
-
 export const workday: AtsHandler = {
   name: 'Workday (first page only)',
 
@@ -81,61 +55,10 @@ export const workday: AtsHandler = {
     }
 
     // Workday tenants usually gate the application behind account
-    // sign-in/creation. By default that's left to the human; if the user has
-    // opted in via config/credentials.json (see credentials.ts — their own
-    // account, their own machine), the sign-in form is filled and submitted
-    // for them. Account creation is never fully automated: the ToS checkbox
-    // and Create Account button always stay with the human.
-    if (await hasVisiblePasswordField(page)) {
-      const creds = loadCredentials('workday');
-      if (!creds) {
-        result.notes.push(
-          'This Workday tenant is asking you to sign in / create an account first — do that ' +
-            'yourself, navigate to the application form, then re-run this command to fill it. ' +
-            '(Optional: copy config/credentials.example.json to config/credentials.json to let ' +
-            'this step sign in for you.)',
-        );
-        return result;
-      }
-
-      let outcome = await fillSignIn(page, creds, profile.email, result);
-
-      // Sign-in submitted but the wall is still up — on a tenant where no
-      // account exists yet that's the expected bounce. With createAccounts
-      // on, pivot to the Create Account form and let fillSignIn complete it
-      // (it agrees to the ToS and clicks Create Account per that opt-in).
-      if (
-        outcome === 'signed-in' &&
-        creds.createAccounts &&
-        !(await isCaptchaPresent(page)) &&
-        (await hasVisiblePasswordField(page))
-      ) {
-        result.notes.push(
-          'Sign-in bounced (probably no account on this tenant yet) — trying account creation, ' +
-            'since createAccounts is on.',
-        );
-        if (await clickCreateAccountLink(page)) {
-          outcome = await fillSignIn(page, creds, profile.email, result);
-        }
-      }
-
-      if (outcome !== 'signed-in' && outcome !== 'account-created') return result;
-
-      if (await isCaptchaPresent(page)) {
-        result.notes.push(
-          'A CAPTCHA / verification challenge appeared after signing in — the form was not ' +
-            'filled. Solve it yourself, then re-run this command.',
-        );
-        return result;
-      }
-      if (await hasVisiblePasswordField(page)) {
-        result.notes.push(
-          'Still on the sign-in/creation page after submitting credentials — they may be wrong ' +
-            'for this tenant, or email verification is needed. Finish signing in yourself, then ' +
-            're-run this command.',
-        );
-        return result;
-      }
+    // sign-in/creation — resolved by the shared wall flow (manual by
+    // default; opt-in credentials/createAccounts per credentials.ts).
+    if (!(await handleSignInWall(page, 'workday', profile.email, result))) {
+      return result;
     }
 
     // Some tenants offer a resume upload ("Autofill with Resume" / Quick

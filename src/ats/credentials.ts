@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { ROOT } from '../core/scan';
-import { contextText } from './helpers';
+import { contextText, isCaptchaPresent } from './helpers';
 import { FillResult } from './types';
 
 /**
@@ -233,4 +233,102 @@ export async function fillSignIn(
   await page.waitForTimeout(500);
   result.notes.push('Submitted the sign-in form with the credentials from config/credentials.json.');
   return 'signed-in';
+}
+
+/** True if the page shows a visible password input — the sign-in-wall tell. */
+export async function hasVisiblePasswordField(page: Page): Promise<boolean> {
+  const passwordFields = page.locator('input[type="password"]');
+  const count = await passwordFields.count().catch(() => 0);
+  for (let i = 0; i < count; i++) {
+    if (await passwordFields.nth(i).isVisible().catch(() => false)) return true;
+  }
+  return false;
+}
+
+/** Click the sign-in page's "Create Account" link/button, if there is one. */
+async function clickCreateAccountLink(page: Page): Promise<boolean> {
+  const byRole = (role: 'link' | 'button') =>
+    page.getByRole(role, { name: /create\s*account|sign\s*up/i }).first();
+  for (const candidate of [byRole('link'), byRole('button')]) {
+    try {
+      await candidate.click({ timeout: 3_000 });
+      await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      return true;
+    } catch {
+      // try the next shape
+    }
+  }
+  return false;
+}
+
+/**
+ * Shared sign-in-wall flow for every ATS handler. If the page shows a
+ * password field, resolve it using the user's opt-in credentials for
+ * `atsKey` (config/credentials.json): sign in, pivot to account creation on
+ * a bounce when createAccounts is on, and re-check for CAPTCHAs / a
+ * still-standing wall afterwards.
+ *
+ * Returns true when the caller should continue filling the application form
+ * (no wall, or the wall was cleared); false when the run should stop with
+ * the notes already explaining why.
+ */
+export async function handleSignInWall(
+  page: Page,
+  atsKey: string,
+  fallbackEmail: string,
+  result: FillResult,
+): Promise<boolean> {
+  if (!(await hasVisiblePasswordField(page))) return true;
+
+  const creds = loadCredentials(atsKey);
+  if (!creds) {
+    result.notes.push(
+      'This site is asking you to sign in / create an account first — do that yourself, ' +
+        'navigate to the application form, then re-run this command to fill it. (Optional: copy ' +
+        `config/credentials.example.json to config/credentials.json with a "${atsKey}" entry to ` +
+        'let this step sign in for you.)',
+    );
+    return false;
+  }
+
+  let outcome = await fillSignIn(page, creds, fallbackEmail, result);
+
+  // Sign-in submitted but the wall is still up — on a tenant where no
+  // account exists yet that's the expected bounce. With createAccounts on,
+  // pivot to the Create Account form and let fillSignIn complete it (it
+  // agrees to the ToS and clicks Create Account per that opt-in).
+  if (
+    outcome === 'signed-in' &&
+    creds.createAccounts &&
+    !(await isCaptchaPresent(page)) &&
+    (await hasVisiblePasswordField(page))
+  ) {
+    result.notes.push(
+      'Sign-in bounced (probably no account on this tenant yet) — trying account creation, ' +
+        'since createAccounts is on.',
+    );
+    if (await clickCreateAccountLink(page)) {
+      outcome = await fillSignIn(page, creds, fallbackEmail, result);
+    }
+  }
+
+  if (outcome !== 'signed-in' && outcome !== 'account-created') return false;
+
+  if (await isCaptchaPresent(page)) {
+    result.notes.push(
+      'A CAPTCHA / verification challenge appeared after signing in — the form was not filled. ' +
+        'Solve it yourself, then re-run this command.',
+    );
+    return false;
+  }
+  if (await hasVisiblePasswordField(page)) {
+    result.notes.push(
+      'Still on the sign-in/creation page after submitting credentials — they may be wrong for ' +
+        'this tenant, or email verification is needed. Finish signing in yourself, then re-run ' +
+        'this command.',
+    );
+    return false;
+  }
+  return true;
 }
