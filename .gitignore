@@ -17,6 +17,7 @@ resumes/
 # Secrets / environment
 .env
 .env.*
+!.env.example
 
 # Stray sqlite files anywhere
 *.sqlite

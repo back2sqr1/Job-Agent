@@ -1,3 +1,4 @@
+import './env'; // load .env before anything reads process.env
 import express from 'express';
 import { DB_PATH, runScan, ScanSummary } from './core/scan';
 import { Store } from './db/store';

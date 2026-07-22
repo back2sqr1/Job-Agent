@@ -1,3 +1,4 @@
+import '../env'; // load .env before anything reads process.env
 import readline from 'node:readline/promises';
 import { chromium } from 'playwright';
 import playwrightConfig from '../../playwright.config';

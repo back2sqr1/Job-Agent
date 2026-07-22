@@ -105,12 +105,13 @@ What it does:
    profile. The dedicated handlers also run the sweep after their own
    pass, so unusually-worded fields get caught everywhere. Fields nothing
    maps to are named in the fill summary rather than silently skipped.
-   Optionally, set the `ANTHROPIC_API_KEY` environment variable to let
-   Claude (via the Anthropic API, billed to your key) classify unusual
-   labels the built-in heuristics can't — only the form's field labels are
-   sent, never your profile data, and every fill still passes the same
-   safety rails (EEO questions hard-refused, no free text, no dropdown
-   guessing, no submit).
+   Optionally, set `ANTHROPIC_API_KEY` to let Claude (via the Anthropic
+   API, billed to your key) classify unusual labels the built-in
+   heuristics can't — only the form's field labels are sent, never your
+   profile data, and every fill still passes the same safety rails (EEO
+   questions hard-refused, no free text, no dropdown guessing, no submit).
+   Set it either as a shell environment variable or by copying `.env.example`
+   to `.env` in the repo root (gitignored) and putting it there.
 
    Workday sign-in is manual by default. Optionally, copy
    `config/credentials.example.json` to `config/credentials.json`

@@ -1,3 +1,4 @@
+import '../env'; // load .env before anything reads process.env
 import { runScan } from '../core/scan';
 
 async function main(): Promise<void> {
